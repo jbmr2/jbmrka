@@ -10,6 +10,8 @@ import { LiveScoring } from './pages/LiveScoring';
 import { ObsOverlay } from './pages/ObsOverlay';
 import { LedDisplay } from './pages/LedDisplay';
 import { UmpirePanel } from './pages/UmpirePanel';
+import { Matches } from './pages/Matches';
+import { MatchDetails } from './pages/MatchDetails';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, isAuthReady } = useAuth();
@@ -35,6 +37,8 @@ export default function App() {
               <Layout>
                 <Routes>
                   <Route path="/" element={<Dashboard />} />
+                  <Route path="/matches" element={<Matches />} />
+                  <Route path="/matches/:id" element={<MatchDetails />} />
                   <Route path="/umpire" element={<ProtectedRoute><UmpirePanel /></ProtectedRoute>} />
                   <Route path="/tournaments/:id" element={<ProtectedRoute><TournamentDetails /></ProtectedRoute>} />
                   <Route path="/teams/:id" element={<ProtectedRoute><TeamDetails /></ProtectedRoute>} />

@@ -16,6 +16,10 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
               <Trophy className="w-6 h-6" />
               <span className="font-bold text-xl tracking-tight">JBMR Raid Arena</span>
             </Link>
+
+            <Link to="/matches" className="text-sm font-semibold text-slate-600 hover:text-indigo-600 transition-colors flex items-center gap-1.5">
+              Matches
+            </Link>
             
             {user && (
               <Link to="/umpire" className="text-sm font-semibold text-slate-600 hover:text-indigo-600 transition-colors flex items-center gap-1.5">
