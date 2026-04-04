@@ -14,7 +14,7 @@ export const ObsOverlay: React.FC = () => {
   const [timerSeconds, setTimerSeconds] = useState(0);
   const [raidTimer, setRaidTimer] = useState(30);
   const [audioEnabled, setAudioEnabled] = useState(false);
-  const [tournamentAudio, setTournamentAudio] = useState(true);
+  const [tournamentAudio, setTournamentAudio] = useState(false);
   
   const whistleRef = React.useRef<HTMLAudioElement | null>(null);
   const buzzerRef = React.useRef<HTMLAudioElement | null>(null);

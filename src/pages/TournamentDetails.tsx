@@ -34,7 +34,7 @@ export const TournamentDetails: React.FC = () => {
   const [teams, setTeams] = useState<Team[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [activeTab, setActiveTab] = useState<'matches' | 'teams' | 'points' | 'bracket'>('matches');
-  const [tournamentAudio, setTournamentAudio] = useState(true);
+  const [tournamentAudio, setTournamentAudio] = useState(false);
   
   const [isCreatingTeam, setIsCreatingTeam] = useState(false);
   const [newTeam, setNewTeam] = useState({ name: '', shortName: '' });
@@ -69,7 +69,7 @@ export const TournamentDetails: React.FC = () => {
         if (docSnap.exists()) {
           const data = docSnap.val();
           setTournament({ id: docSnap.key, ...data });
-          setTournamentAudio(data.audioEnabled !== false);
+          setTournamentAudio(data.audioEnabled === true);
         } else {
           navigate('/');
         }
