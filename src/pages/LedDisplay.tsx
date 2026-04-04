@@ -276,28 +276,6 @@ export const LedDisplay: React.FC = () => {
         </div>
 
       </div>
-
-      {/* FOOTER: Scrolling or Extra Info */}
-      <div className="h-12 bg-zinc-900 rounded-xl border-2 border-zinc-800 flex items-center px-6 overflow-hidden">
-        <div className="flex gap-12 animate-[ticker_20s_linear_infinite] whitespace-nowrap">
-          <span className="text-yellow-500 font-bold uppercase tracking-widest">
-            {tournament?.location || 'PRO KABADDI VENUE'} • {new Date().toLocaleDateString()} • {match.status}
-          </span>
-          <span className="text-white font-bold uppercase tracking-widest">
-            {teamA?.name} VS {teamB?.name} • SCORE: {match.teamAScore} - {match.teamBScore}
-          </span>
-          <span className="text-yellow-500 font-bold uppercase tracking-widest">
-            COURTESY OF PRO KABADDI SCORE SYSTEM • LIVE BROADCAST FEED
-          </span>
-        </div>
-      </div>
-
-      <style>{`
-        @keyframes ticker {
-          0% { transform: translateX(100%); }
-          100% { transform: translateX(-100%); }
-        }
-      `}</style>
     </div>
   );
 };

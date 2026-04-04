@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ref, onValue, push, set, query, orderByChild, equalTo, limitToLast } from 'firebase/database';
+import { ref, onValue, push, set, query, orderByChild, equalTo, limitToLast, remove } from 'firebase/database';
 import { db, loginWithGoogle } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
-import { Plus, Trophy, Calendar, MapPin, PlayCircle, Swords, ArrowRight } from 'lucide-react';
+import { Plus, Trophy, Calendar, MapPin, PlayCircle, Swords, ArrowRight, Trash2, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface Tournament {
@@ -21,6 +21,7 @@ export const Dashboard: React.FC = () => {
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [liveMatches, setLiveMatches] = useState<any[]>([]);
   const [isCreating, setIsCreating] = useState(false);
+  const [tournamentToDelete, setTournamentToDelete] = useState<string | null>(null);
   const [newTournament, setNewTournament] = useState({ name: '', location: '', startDate: '', endDate: '' });
 
   useEffect(() => {
@@ -83,6 +84,16 @@ export const Dashboard: React.FC = () => {
       setNewTournament({ name: '', location: '', startDate: '', endDate: '' });
     } catch (error) {
       console.error("Error creating tournament:", error);
+    }
+  };
+
+  const handleDeleteTournament = async (id: string) => {
+    if (!user) return;
+    try {
+      await remove(ref(db, `tournaments/${id}`));
+      setTournamentToDelete(null);
+    } catch (error) {
+      console.error("Error deleting tournament:", error);
     }
   };
 
@@ -279,6 +290,16 @@ export const Dashboard: React.FC = () => {
                 <div className="p-3 bg-indigo-50 text-indigo-600 rounded-lg group-hover:bg-indigo-600 group-hover:text-white transition-colors">
                   <Trophy className="w-6 h-6" />
                 </div>
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setTournamentToDelete(tournament.id);
+                  }}
+                  className="p-2 text-slate-300 hover:text-red-600 transition-colors"
+                >
+                  <Trash2 className="w-5 h-5" />
+                </button>
               </div>
               <h3 className="text-xl font-bold text-slate-900 mb-2 line-clamp-2">{tournament.name}</h3>
               
@@ -302,6 +323,34 @@ export const Dashboard: React.FC = () => {
               </div>
             </Link>
           ))}
+        </div>
+      )}
+
+      {tournamentToDelete && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-[32px] p-8 max-w-md w-full shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-200">
+            <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mb-6">
+              <AlertTriangle className="w-8 h-8 text-red-600" />
+            </div>
+            <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight mb-2">Delete Tournament?</h3>
+            <p className="text-slate-500 font-medium italic mb-8">
+              This action cannot be undone. All teams and matches associated with this tournament will remain in the database but will lose their connection to this tournament.
+            </p>
+            <div className="flex gap-4">
+              <button
+                onClick={() => setTournamentToDelete(null)}
+                className="flex-1 px-6 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-200 transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleDeleteTournament(tournamentToDelete)}
+                className="flex-1 px-6 py-4 bg-red-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-red-200 hover:bg-red-700 transition-all"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
