@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ref, onValue, query } from 'firebase/database';
 import { db } from '../firebase';
-import { Timer, ArrowLeft, History, Users, Swords, Activity, Monitor, Tv } from 'lucide-react';
+import { Timer, ArrowLeft, History, Users, Swords, Activity, Monitor, Tv, Trophy } from 'lucide-react';
 
 export const MatchDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -129,7 +129,15 @@ export const MatchDetails: React.FC = () => {
       {/* Scoreboard Card */}
       <div className="bg-slate-900 rounded-[32px] overflow-hidden shadow-2xl border border-white/5">
         <div className="bg-white/5 backdrop-blur-sm p-4 flex justify-between items-center border-b border-white/5">
-          <span className="text-white/40 font-black uppercase text-[10px] tracking-[0.3em]">{match.status || 'Scheduled'}</span>
+          <div className="flex items-center gap-4">
+            <span className="text-white/40 font-black uppercase text-[10px] tracking-[0.3em]">{match.status || 'Scheduled'}</span>
+            {match.tournamentId && (
+              <Link to={`/tournaments/${match.tournamentId}/view`} className="text-[9px] font-black text-indigo-400 hover:text-indigo-300 uppercase tracking-widest flex items-center gap-1">
+                <Trophy className="w-3 h-3" />
+                Standings & Arena
+              </Link>
+            )}
+          </div>
           <div className="flex items-center gap-2 text-indigo-400 font-mono font-black text-xl">
             <Timer className="w-5 h-5" />
             {formatTime(timerSeconds)}

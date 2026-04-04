@@ -13,6 +13,8 @@ interface Match {
   teamAScore: number;
   teamBScore: number;
   status: string;
+  tournamentId?: string;
+  tournamentName?: string;
   matchDate?: string;
   createdAt: string;
 }
@@ -110,9 +112,17 @@ export const Matches: React.FC = () => {
             <div key={match.id} className="bg-white rounded-3xl border border-slate-200 shadow-sm hover:shadow-xl transition-all overflow-hidden flex flex-col group">
               <div className="p-6 flex-1">
                 <div className="flex justify-between items-start mb-6">
-                  <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase border tracking-widest ${getStatusColor(match.status)}`}>
-                    {match.status}
-                  </span>
+                  <div className="flex flex-col gap-2">
+                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase border tracking-widest w-fit ${getStatusColor(match.status)}`}>
+                      {match.status}
+                    </span>
+                    {match.tournamentId && (
+                      <Link to={`/tournaments/${match.tournamentId}/view`} className="text-[9px] font-black text-indigo-600 hover:text-indigo-800 uppercase tracking-tighter flex items-center gap-1 group/link">
+                        <Trophy className="w-3 h-3 group-hover/link:rotate-12 transition-transform" />
+                        {match.tournamentName || 'Tournament Arena'}
+                      </Link>
+                    )}
+                  </div>
                   {match.matchDate && (
                     <div className="flex items-center gap-1.5 text-slate-400 font-bold text-[10px] uppercase tracking-tighter">
                       <Calendar className="w-3.5 h-3.5" />
