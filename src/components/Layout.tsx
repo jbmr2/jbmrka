@@ -14,7 +14,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
           <div className="flex items-center gap-6">
             <Link to="/" className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700 transition-colors">
               <Trophy className="w-6 h-6" />
-              <span className="font-bold text-xl tracking-tight">Kabaddi Pro Score</span>
+              <span className="font-bold text-xl tracking-tight">JBMR Raid Arena</span>
             </Link>
             
             {user && (

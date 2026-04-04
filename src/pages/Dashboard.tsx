@@ -76,7 +76,7 @@ export const Dashboard: React.FC = () => {
       <div className="text-center py-20">
         <Trophy className="w-20 h-20 text-indigo-200 mx-auto mb-6" />
         <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight mb-4">
-          Professional Kabaddi Scoring
+          JBMR Raid Arena
         </h1>
         <p className="text-xl text-slate-600 max-w-2xl mx-auto mb-8">
           Manage tournaments, teams, players, and score matches live with raid-by-raid tracking.
