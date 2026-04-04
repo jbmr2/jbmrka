@@ -44,6 +44,9 @@ export const TournamentView: React.FC = () => {
       } else {
         setLoading(false);
       }
+    }, (error) => {
+      console.error("Error fetching tournament:", error);
+      setLoading(false);
     });
 
     // Fetch teams
@@ -69,6 +72,9 @@ export const TournamentView: React.FC = () => {
         return timeB - timeA;
       });
       setMatches(m);
+      setLoading(false);
+    }, (error) => {
+      console.error("Error fetching matches:", error);
       setLoading(false);
     });
 

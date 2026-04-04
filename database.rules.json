@@ -1,12 +1,23 @@
 {
   "rules": {
-    ".read": "auth != null",
-    ".write": "auth != null",
     "matches": {
-      "$matchId": {
-        ".read": true,
-        ".write": "auth != null"
-      }
+      ".read": true,
+      ".write": "auth != null",
+      ".indexOn": ["createdAt", "tournamentId", "ownerId", "updatedAt"]
+    },
+    "tournaments": {
+      ".read": true,
+      ".write": "auth != null",
+      ".indexOn": ["ownerId"]
+    },
+    "teams": {
+      ".read": true,
+      ".write": "auth != null",
+      ".indexOn": ["tournamentId", "ownerId"]
+    },
+    "users": {
+      ".read": "auth != null",
+      ".write": "auth != null"
     }
   }
 }

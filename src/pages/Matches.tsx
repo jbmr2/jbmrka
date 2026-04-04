@@ -39,6 +39,9 @@ export const Matches: React.FC = () => {
       });
       setMatches(m);
       setLoading(false);
+    }, (error) => {
+      console.error("Error fetching matches:", error);
+      setLoading(false);
     });
     return () => unsub();
   }, []);

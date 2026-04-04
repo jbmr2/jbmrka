@@ -49,6 +49,9 @@ export const MatchDetails: React.FC = () => {
         setRaidTimer(currentRaidSeconds);
       }
       setLoading(false);
+    }, (error) => {
+      console.error("Error fetching match:", error);
+      setLoading(false);
     });
 
     const raidsQ = query(ref(db, `matches/${id}/raids`));
