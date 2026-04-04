@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ref, onValue, push, set, query, orderByChild, equalTo } from 'firebase/database';
-import { db } from '../firebase';
+import { ref, onValue, push, set, query, orderByChild, equalTo, limitToLast } from 'firebase/database';
+import { db, loginWithGoogle } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
-import { Plus, Trophy, Calendar, MapPin } from 'lucide-react';
+import { Plus, Trophy, Calendar, MapPin, PlayCircle, Swords, ArrowRight } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface Tournament {
@@ -19,8 +19,25 @@ interface Tournament {
 export const Dashboard: React.FC = () => {
   const { user, isAuthReady } = useAuth();
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
+  const [liveMatches, setLiveMatches] = useState<any[]>([]);
   const [isCreating, setIsCreating] = useState(false);
   const [newTournament, setNewTournament] = useState({ name: '', location: '', startDate: '', endDate: '' });
+
+  useEffect(() => {
+    // Fetch some live matches for public view
+    const matchesRef = query(ref(db, 'matches'), orderByChild('updatedAt'), limitToLast(3));
+    const unsubMatches = onValue(matchesRef, (snap) => {
+      const m: any[] = [];
+      snap.forEach(child => {
+        const val = child.val();
+        if (['First Half', 'Second Half', 'Halftime'].includes(val.status)) {
+          m.push({ id: child.key, ...val });
+        }
+      });
+      setLiveMatches(m.reverse());
+    });
+    return () => unsubMatches();
+  }, []);
 
   useEffect(() => {
     if (!isAuthReady || !user) return;
@@ -73,15 +90,86 @@ export const Dashboard: React.FC = () => {
 
   if (!user) {
     return (
-      <div className="text-center py-20">
-        <Trophy className="w-20 h-20 text-indigo-200 mx-auto mb-6" />
-        <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight mb-4">
-          JBMR Raid Arena
-        </h1>
-        <p className="text-xl text-slate-600 max-w-2xl mx-auto mb-8">
-          Manage tournaments, teams, players, and score matches live with raid-by-raid tracking.
-        </p>
-        <p className="text-slate-500">Sign in to get started.</p>
+      <div className="space-y-16 py-12">
+        <div className="text-center max-w-4xl mx-auto px-4">
+          <div className="w-20 h-20 bg-indigo-100 rounded-[2rem] flex items-center justify-center mx-auto mb-8 shadow-xl">
+            <Trophy className="w-10 h-10 text-indigo-600" />
+          </div>
+          <h1 className="text-5xl md:text-7xl font-black text-slate-900 tracking-tighter mb-6 uppercase leading-tight">
+            JBMR RAID <span className="text-indigo-600">ARENA</span>
+          </h1>
+          <p className="text-xl text-slate-500 font-medium italic mb-10 max-w-2xl mx-auto">
+            Professional Kabaddi scoring & tournament management for the digital era.
+          </p>
+          
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <Link 
+              to="/matches" 
+              className="w-full sm:w-auto px-8 py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-2xl hover:bg-indigo-700 hover:scale-105 transition-all flex items-center justify-center gap-2"
+            >
+              <PlayCircle className="w-5 h-5" /> View Live Scores
+            </Link>
+            <button 
+              onClick={loginWithGoogle}
+              className="w-full sm:w-auto px-8 py-4 bg-white border-2 border-slate-100 text-slate-900 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl hover:border-indigo-600 transition-all flex items-center justify-center gap-2"
+            >
+              Organize Match <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {liveMatches.length > 0 && (
+          <div className="max-w-6xl mx-auto px-4">
+            <div className="flex items-center justify-between mb-8 border-b border-slate-200 pb-4">
+              <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter flex items-center gap-2">
+                <div className="w-2 h-2 bg-red-500 rounded-full animate-ping" />
+                Live In Arena
+              </h2>
+              <Link to="/matches" className="text-xs font-black text-indigo-600 uppercase tracking-widest hover:translate-x-1 transition-transform flex items-center gap-1">
+                View All <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {liveMatches.map(m => (
+                <Link key={m.id} to={`/matches/${m.id}`} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-xl hover:shadow-2xl hover:border-indigo-200 transition-all group">
+                  <div className="flex justify-between items-center mb-6">
+                    <span className="text-[9px] font-black bg-emerald-50 text-emerald-600 px-2.5 py-1 rounded-full border border-emerald-100 uppercase tracking-widest">{m.status}</span>
+                    <div className="flex items-center gap-1 text-[8px] font-bold text-slate-400 uppercase tracking-tighter">
+                      <Swords className="w-3 h-3" /> LIVE FEED
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center justify-between text-center gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[10px] font-black text-slate-400 uppercase tracking-tight truncate mb-2">{m.teamAName}</div>
+                      <div className="text-4xl font-black text-slate-900 tabular-nums">{m.teamAScore || 0}</div>
+                    </div>
+                    <div className="text-[10px] font-black text-slate-300 italic">VS</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[10px] font-black text-slate-400 uppercase tracking-tight truncate mb-2">{m.teamBName}</div>
+                      <div className="text-4xl font-black text-slate-900 tabular-nums">{m.teamBScore || 0}</div>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="max-w-6xl mx-auto px-4 grid grid-cols-1 md:grid-cols-3 gap-8 pt-12">
+          {[
+            { title: 'Live Scoring', desc: 'Real-time raid tracking with automatic score calculation.', icon: '⚡' },
+            { title: 'OBS Graphics', desc: 'Professional broadcast overlays for live streams & YouTube.', icon: '🎬' },
+            { title: 'Statistics', desc: 'Full raid history and team performance analytics.', icon: '📊' }
+          ].map((feature, i) => (
+            <div key={i} className="bg-slate-50 p-8 rounded-3xl border border-white/40 shadow-sm text-center">
+              <div className="text-3xl mb-4">{feature.icon}</div>
+              <h3 className="font-black text-slate-900 uppercase text-sm mb-2">{feature.title}</h3>
+              <p className="text-slate-500 text-xs font-medium leading-relaxed">{feature.desc}</p>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
