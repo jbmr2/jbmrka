@@ -151,12 +151,17 @@ export const ObsOverlay: React.FC = () => {
 
         {/* Center Info */}
         <div className="flex flex-col items-center justify-center px-8 py-2 bg-slate-900/95 min-w-[200px]">
-          <div className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-1">
+          <div className="text-slate-400 text-[10px] font-black uppercase tracking-widest leading-none mb-1">
             {match.status === 'Scheduled' ? 'First Half' : match.status}
           </div>
-          <div className="text-4xl font-mono font-bold text-white drop-shadow-md">
+          <div className="text-4xl font-mono font-bold text-white drop-shadow-md leading-tight">
             {formatTime(timerSeconds)}
           </div>
+          {match.matchDate && (
+            <div className="text-[8px] font-black text-slate-500 uppercase tracking-tighter mt-1">
+              {new Date(match.matchDate).toLocaleDateString([], { month: 'short', day: 'numeric' })} • {new Date(match.matchDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </div>
+          )}
         </div>
 
         {/* Team B */}
