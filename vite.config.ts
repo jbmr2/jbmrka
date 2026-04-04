@@ -7,6 +7,7 @@ export default defineConfig(({mode}) => {
   return {
     plugins: [react(), tailwindcss()],
     build: {
+      outDir: 'build',
       chunkSizeWarningLimit: 1000
     },
     resolve: {
