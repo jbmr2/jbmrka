@@ -489,25 +489,45 @@ export const UmpirePanel: React.FC = () => {
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-        <button
-          onClick={() => setSelectedMatchId(null)}
-          className="text-sm font-bold text-slate-500 hover:text-slate-800 transition-colors flex items-center gap-1"
-        >
-          <RotateCcw className="w-4 h-4" /> Change Match
-        </button>
-        <div className="flex items-center gap-4">
-          <select
-            value={match.status || 'Scheduled'}
-            onChange={(e) => updateMatchStatus(e.target.value)}
-            className="text-sm font-bold px-4 py-1.5 bg-slate-100 border border-slate-200 rounded-full text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+      <div className="flex flex-col gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => setSelectedMatchId(null)}
+            className="text-sm font-bold text-slate-500 hover:text-slate-800 transition-colors flex items-center gap-1"
           >
-            <option value="Scheduled">Scheduled</option>
-            <option value="First Half">First Half</option>
-            <option value="Halftime">Halftime</option>
-            <option value="Second Half">Second Half</option>
-            <option value="Completed">Completed</option>
-          </select>
+            <RotateCcw className="w-4 h-4" /> Change Match
+          </button>
+          <div className="flex items-center gap-4">
+            <select
+              value={match.status || 'Scheduled'}
+              onChange={(e) => updateMatchStatus(e.target.value)}
+              className="text-sm font-bold px-4 py-1.5 bg-slate-100 border border-slate-200 rounded-full text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+            >
+              <option value="Scheduled">Scheduled</option>
+              <option value="First Half">First Half</option>
+              <option value="Halftime">Halftime</option>
+              <option value="Second Half">Second Half</option>
+              <option value="Completed">Completed</option>
+            </select>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-4 pt-2 border-t border-slate-100">
+          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Broadcast Links:</span>
+          <Link 
+            to={`/obs/${selectedMatchId}`} 
+            target="_blank"
+            className="text-[10px] font-bold bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full hover:bg-indigo-600 hover:text-white transition-all uppercase"
+          >
+            OBS Overlay
+          </Link>
+          <Link 
+            to={`/led/${selectedMatchId}`} 
+            target="_blank"
+            className="text-[10px] font-bold bg-orange-50 text-orange-600 px-3 py-1 rounded-full hover:bg-orange-600 hover:text-white transition-all uppercase"
+          >
+            LED Display
+          </Link>
         </div>
       </div>
 

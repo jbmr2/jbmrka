@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ref, onValue, push, set, query, orderByChild, equalTo, get, remove } from 'firebase/database';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
-import { Users, Swords, Plus, ArrowLeft, Shield, Trash2, AlertTriangle, Calendar, Timer } from 'lucide-react';
+import { Users, Swords, Plus, ArrowLeft, Shield, Trash2, AlertTriangle, Calendar, Timer, Monitor, Tv } from 'lucide-react';
 
 interface Team {
   id: string;
@@ -384,13 +384,22 @@ export const TournamentDetails: React.FC = () => {
                     </span>
                     <div className="flex items-center gap-2">
                       <Link
+                        to={`/obs/${match.id}`}
+                        target="_blank"
+                        onClick={(e) => e.stopPropagation()}
+                        className="p-1.5 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-md transition-colors"
+                        title="Open OBS Overlay"
+                      >
+                        <Monitor className="w-4 h-4" />
+                      </Link>
+                      <Link
                         to={`/led/${match.id}`}
                         target="_blank"
                         onClick={(e) => e.stopPropagation()}
                         className="p-1.5 text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50 rounded-md transition-colors"
                         title="Open LED Display"
                       >
-                        <Timer className="w-4 h-4" />
+                        <Tv className="w-4 h-4" />
                       </Link>
                       <button
                         onClick={(e) => {
