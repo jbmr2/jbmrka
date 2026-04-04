@@ -3,6 +3,9 @@ import { useParams } from 'react-router-dom';
 import { ref, onValue } from 'firebase/database';
 import { db } from '../firebase';
 
+const WHISTLE_URL = 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3';
+const BUZZER_URL = 'https://assets.mixkit.co/active_storage/sfx/951/951-preview.mp3';
+
 export const ObsOverlay: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [match, setMatch] = useState<any>(null);
@@ -10,7 +13,26 @@ export const ObsOverlay: React.FC = () => {
   const [teamB, setTeamB] = useState<any>(null);
   const [timerSeconds, setTimerSeconds] = useState(0);
   const [raidTimer, setRaidTimer] = useState(30);
+  const [audioEnabled, setAudioEnabled] = useState(false);
+  
+  const whistleRef = React.useRef<HTMLAudioElement | null>(null);
+  const buzzerRef = React.useRef<HTMLAudioElement | null>(null);
   const serverOffsetRef = React.useRef<number>(0);
+  const lastTimerStateRef = React.useRef<boolean>(false);
+
+  useEffect(() => {
+    whistleRef.current = new Audio(WHISTLE_URL);
+    buzzerRef.current = new Audio(BUZZER_URL);
+  }, []);
+
+  const playSound = (type: 'whistle' | 'buzzer') => {
+    if (!audioEnabled) return;
+    const audio = type === 'whistle' ? whistleRef.current : buzzerRef.current;
+    if (audio) {
+      audio.currentTime = 0;
+      audio.play().catch(e => console.error("Audio play failed", e));
+    }
+  };
 
   // Sync with server time offset
   useEffect(() => {
@@ -94,6 +116,21 @@ export const ObsOverlay: React.FC = () => {
     return () => clearInterval(interval);
   }, [match?.isRaidTimerRunning]);
 
+  useEffect(() => {
+    if (match) {
+      if (match.isTimerRunning !== lastTimerStateRef.current) {
+        playSound('whistle');
+        lastTimerStateRef.current = !!match.isTimerRunning;
+      }
+    }
+  }, [match?.isTimerRunning]);
+
+  useEffect(() => {
+    if (raidTimer === 0 && match?.isRaidTimerRunning) {
+      playSound('buzzer');
+    }
+  }, [raidTimer, match?.isRaidTimerRunning]);
+
   if (!match) return null;
 
   const formatTime = (seconds: number) => {
@@ -103,7 +140,17 @@ export const ObsOverlay: React.FC = () => {
   };
 
   return (
-    <div className="w-screen h-screen bg-transparent overflow-hidden font-sans">
+    <div className="w-screen h-screen bg-transparent overflow-hidden font-sans relative">
+      {/* Audio Enable Overlay */}
+      {!audioEnabled && (
+        <button 
+          onClick={() => setAudioEnabled(true)}
+          className="fixed top-4 right-4 z-[200] bg-indigo-600/80 hover:bg-indigo-600 text-white px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest shadow-xl transition-all border border-white/20 backdrop-blur-sm"
+        >
+          Enable Broadcast Audio
+        </button>
+      )}
+
       {/* Left Raid Box (Team A) */}
       {match.raidingTeam === 'A' && (match.isRaidTimerRunning || raidTimer < 30) && (
         <div className="absolute left-8 bottom-8 w-24 h-24 bg-slate-900/90 border-4 border-indigo-600 rounded-xl flex flex-col items-center justify-center shadow-2xl animate-in slide-in-from-left duration-300">

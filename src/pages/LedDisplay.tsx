@@ -3,6 +3,9 @@ import { useParams } from 'react-router-dom';
 import { ref, onValue, get } from 'firebase/database';
 import { db } from '../firebase';
 
+const WHISTLE_URL = 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3';
+const BUZZER_URL = 'https://assets.mixkit.co/active_storage/sfx/951/951-preview.mp3';
+
 export const LedDisplay: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [match, setMatch] = useState<any>(null);
@@ -11,7 +14,26 @@ export const LedDisplay: React.FC = () => {
   const [tournament, setTournament] = useState<any>(null);
   const [timerSeconds, setTimerSeconds] = useState(0);
   const [raidTimer, setRaidTimer] = useState(30);
+  const [audioEnabled, setAudioEnabled] = useState(false);
+  
+  const whistleRef = React.useRef<HTMLAudioElement | null>(null);
+  const buzzerRef = React.useRef<HTMLAudioElement | null>(null);
   const serverOffsetRef = React.useRef<number>(0);
+  const lastTimerStateRef = React.useRef<boolean>(false);
+
+  useEffect(() => {
+    whistleRef.current = new Audio(WHISTLE_URL);
+    buzzerRef.current = new Audio(BUZZER_URL);
+  }, []);
+
+  const playSound = (type: 'whistle' | 'buzzer') => {
+    if (!audioEnabled) return;
+    const audio = type === 'whistle' ? whistleRef.current : buzzerRef.current;
+    if (audio) {
+      audio.currentTime = 0;
+      audio.play().catch(e => console.error("Audio play failed", e));
+    }
+  };
 
   // Sync with server time offset
   useEffect(() => {
@@ -103,6 +125,21 @@ export const LedDisplay: React.FC = () => {
     return () => clearInterval(interval);
   }, [match?.isRaidTimerRunning]);
 
+  useEffect(() => {
+    if (match) {
+      if (match.isTimerRunning !== lastTimerStateRef.current) {
+        playSound('whistle');
+        lastTimerStateRef.current = !!match.isTimerRunning;
+      }
+    }
+  }, [match?.isTimerRunning]);
+
+  useEffect(() => {
+    if (raidTimer === 0 && match?.isRaidTimerRunning) {
+      playSound('buzzer');
+    }
+  }, [raidTimer, match?.isRaidTimerRunning]);
+
   if (!match) return null;
 
   const formatTime = (seconds: number) => {
@@ -113,6 +150,15 @@ export const LedDisplay: React.FC = () => {
 
   return (
     <div className="w-screen h-screen bg-black overflow-hidden font-mono select-none flex flex-col p-6 text-white relative">
+      {/* Audio Enable Overlay */}
+      {!audioEnabled && (
+        <button 
+          onClick={() => setAudioEnabled(true)}
+          className="fixed top-4 right-4 z-[200] bg-yellow-500 text-black px-6 py-2 rounded-lg text-sm font-black uppercase tracking-widest shadow-[0_0_20px_rgba(234,179,8,0.4)] transition-all animate-pulse"
+        >
+          Activate Audio
+        </button>
+      )}
       
       {/* LED DOT OVERLAY */}
       <div className="pointer-events-none fixed inset-0 opacity-[0.15] z-50 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]" />

@@ -2,14 +2,37 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ref, onValue, update, query, orderByChild, equalTo, push, set } from 'firebase/database';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
-import { Play, Pause, RotateCcw, Timer, Check, AlertCircle, ChevronRight, LayoutDashboard, Minus, Plus, ArrowRightLeft } from 'lucide-react';
+import { Play, Pause, RotateCcw, Timer, Check, AlertCircle, ChevronRight, LayoutDashboard, Minus, Plus, ArrowRightLeft, Volume2, VolumeX } from 'lucide-react';
 import { Link } from 'react-router-dom';
+
+const WHISTLE_URL = 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3';
+const BUZZER_URL = 'https://assets.mixkit.co/active_storage/sfx/951/951-preview.mp3';
 
 export const UmpirePanel: React.FC = () => {
   const { user } = useAuth();
   const [matches, setMatches] = useState<any[]>([]);
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
   const [match, setMatch] = useState<any>(null);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  
+  const whistleRef = useRef<HTMLAudioElement | null>(null);
+  const buzzerRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    whistleRef.current = new Audio(WHISTLE_URL);
+    buzzerRef.current = new Audio(BUZZER_URL);
+  }, []);
+
+  const playSound = (type: 'whistle' | 'buzzer') => {
+    if (!soundEnabled) return;
+    if (type === 'whistle' && whistleRef.current) {
+      whistleRef.current.currentTime = 0;
+      whistleRef.current.play().catch(e => console.error("Audio play failed", e));
+    } else if (type === 'buzzer' && buzzerRef.current) {
+      buzzerRef.current.currentTime = 0;
+      buzzerRef.current.play().catch(e => console.error("Audio play failed", e));
+    }
+  };
   
   const [timerSeconds, setTimerSeconds] = useState(0);
   const [isTimerRunning, setIsTimerRunning] = useState(false);
@@ -152,6 +175,7 @@ export const UmpirePanel: React.FC = () => {
       raidIntervalRef.current = setInterval(() => {
         setRaidTimer(prev => {
           if (prev <= 1) {
+            playSound('buzzer');
             stopRaidTimer();
             return 0;
           }
@@ -188,11 +212,13 @@ export const UmpirePanel: React.FC = () => {
       timerUpdatedAt: getServerTime(),
       status: match.status === 'Scheduled' ? 'First Half' : match.status
     });
+    playSound('whistle');
   };
 
   const stopMatchTimer = async () => {
     if (!selectedMatchId) return;
     setIsTimerRunning(false);
+    playSound('whistle');
     await update(ref(db, `matches/${selectedMatchId}`), {
       isTimerRunning: false,
       timerSeconds: 0,
@@ -325,6 +351,13 @@ export const UmpirePanel: React.FC = () => {
             <Link to="/" className="text-sm font-semibold text-indigo-600 hover:text-indigo-700 flex items-center gap-1">
               <LayoutDashboard className="w-4 h-4" /> Dashboard
             </Link>
+            <button
+              onClick={() => setSoundEnabled(!soundEnabled)}
+              className={`p-2 rounded-lg transition-colors ${soundEnabled ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}
+              title={soundEnabled ? "Sound Enabled" : "Sound Muted"}
+            >
+              {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+            </button>
           </div>
         </div>
 
