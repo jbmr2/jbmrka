@@ -15,6 +15,7 @@ export const ObsOverlay: React.FC = () => {
   const [raidTimer, setRaidTimer] = useState(30);
   const [audioEnabled, setAudioEnabled] = useState(false);
   const [tournamentAudio, setTournamentAudio] = useState(false);
+  const [loading, setLoading] = useState(true);
   
   const whistleRef = React.useRef<HTMLAudioElement | null>(null);
   const buzzerRef = React.useRef<HTMLAudioElement | null>(null);
@@ -80,6 +81,7 @@ export const ObsOverlay: React.FC = () => {
           });
         }
       }
+      setLoading(false);
     });
 
     return () => unsubMatch();
@@ -141,7 +143,8 @@ export const ObsOverlay: React.FC = () => {
     }
   }, [raidTimer, match?.isRaidTimerRunning]);
 
-  if (!match) return null;
+  if (loading) return null; // Overlays should be invisible while loading
+  if (!match) return null; // Overlays should be invisible if match doesn't exist
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);

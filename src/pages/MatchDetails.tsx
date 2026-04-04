@@ -8,6 +8,7 @@ export const MatchDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [match, setMatch] = useState<any>(null);
   const [raids, setRaids] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [timerSeconds, setTimerSeconds] = useState(0);
   const [raidTimer, setRaidTimer] = useState(30);
   const serverOffsetRef = useRef<number>(0);
@@ -47,6 +48,7 @@ export const MatchDetails: React.FC = () => {
         }
         setRaidTimer(currentRaidSeconds);
       }
+      setLoading(false);
     });
 
     const raidsQ = query(ref(db, `matches/${id}/raids`));
@@ -85,7 +87,22 @@ export const MatchDetails: React.FC = () => {
     return () => clearInterval(interval);
   }, [match?.isRaidTimerRunning]);
 
-  if (!match) return <div className="flex justify-center p-20"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div></div>;
+  if (loading) return <div className="flex justify-center p-20"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div></div>;
+  
+  if (!match) {
+    return (
+      <div className="flex flex-col items-center justify-center p-20 text-center">
+        <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-6">
+          <Swords className="w-10 h-10 text-slate-300" />
+        </div>
+        <h2 className="text-2xl font-black text-slate-900 uppercase mb-2">Match Not Found</h2>
+        <p className="text-slate-500 mb-8 max-w-xs">This match record might have been deleted or is currently unavailable.</p>
+        <Link to="/matches" className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-black uppercase text-xs shadow-lg hover:bg-indigo-700 transition-all">
+          Go to Arena
+        </Link>
+      </div>
+    );
+  }
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);

@@ -12,6 +12,7 @@ export const LedDisplay: React.FC = () => {
   const [teamA, setTeamA] = useState<any>(null);
   const [teamB, setTeamB] = useState<any>(null);
   const [tournament, setTournament] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   const [timerSeconds, setTimerSeconds] = useState(0);
   const [raidTimer, setRaidTimer] = useState(30);
   const [audioEnabled, setAudioEnabled] = useState(false);
@@ -79,6 +80,7 @@ export const LedDisplay: React.FC = () => {
           });
         }
       }
+      setLoading(false);
     });
 
     return () => unsubMatch();
@@ -140,7 +142,13 @@ export const LedDisplay: React.FC = () => {
     }
   }, [raidTimer, match?.isRaidTimerRunning]);
 
-  if (!match) return null;
+  if (loading) return <div className="w-screen h-screen bg-black flex items-center justify-center text-yellow-500 font-black uppercase tracking-widest animate-pulse">Loading Arena...</div>;
+
+  if (!match) return <div className="w-screen h-screen bg-black flex flex-col items-center justify-center text-red-500 font-black p-12 text-center uppercase border-8 border-red-900/30">
+    <Swords className="w-20 h-20 mb-6 opacity-20" />
+    <span className="text-4xl tracking-tighter mb-4">MATCH RECORD NOT FOUND</span>
+    <span className="text-zinc-600 text-sm tracking-widest">PLEASE CHECK THE MATCH ID IN YOUR OBS/LED LINK</span>
+  </div>;
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
