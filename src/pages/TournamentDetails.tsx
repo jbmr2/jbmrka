@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ref, onValue, push, set, query, orderByChild, equalTo, get, remove } from 'firebase/database';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
-import { Users, Swords, Plus, ArrowLeft, Shield, Trash2, AlertTriangle, Calendar, Timer, Monitor, Tv, BarChart3, GitGraph } from 'lucide-react';
+import { Users, Swords, Plus, ArrowLeft, Shield, Trash2, AlertTriangle, Calendar, Timer, Monitor, Tv, BarChart3, GitGraph, Volume2, VolumeX } from 'lucide-react';
 
 interface Team {
   id: string;
@@ -34,6 +34,7 @@ export const TournamentDetails: React.FC = () => {
   const [teams, setTeams] = useState<Team[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [activeTab, setActiveTab] = useState<'matches' | 'teams' | 'points' | 'bracket'>('matches');
+  const [tournamentAudio, setTournamentAudio] = useState(true);
   
   const [isCreatingTeam, setIsCreatingTeam] = useState(false);
   const [newTeam, setNewTeam] = useState({ name: '', shortName: '' });
@@ -66,7 +67,9 @@ export const TournamentDetails: React.FC = () => {
         const docRef = ref(db, `tournaments/${id}`);
         const docSnap = await get(docRef);
         if (docSnap.exists()) {
-          setTournament({ id: docSnap.key, ...docSnap.val() });
+          const data = docSnap.val();
+          setTournament({ id: docSnap.key, ...data });
+          setTournamentAudio(data.audioEnabled !== false);
         } else {
           navigate('/');
         }
@@ -237,6 +240,22 @@ export const TournamentDetails: React.FC = () => {
             <p className="text-slate-500 mt-1">Tournament Management & Analytics</p>
           </div>
         </div>
+
+        <button 
+          onClick={async () => {
+            const newState = !tournamentAudio;
+            setTournamentAudio(newState);
+            try {
+              await set(ref(db, `tournaments/${id}/audioEnabled`), newState);
+            } catch (error) {
+              console.error("Error updating audio state:", error);
+            }
+          }}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black uppercase transition-all shadow-lg ${tournamentAudio ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-slate-200 text-slate-500 hover:bg-slate-300'}`}
+        >
+          {tournamentAudio ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+          Audio {tournamentAudio ? 'ON' : 'OFF'}
+        </button>
 
         <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
           <button 

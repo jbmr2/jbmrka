@@ -14,6 +14,7 @@ export const ObsOverlay: React.FC = () => {
   const [timerSeconds, setTimerSeconds] = useState(0);
   const [raidTimer, setRaidTimer] = useState(30);
   const [audioEnabled, setAudioEnabled] = useState(false);
+  const [tournamentAudio, setTournamentAudio] = useState(true);
   
   const whistleRef = React.useRef<HTMLAudioElement | null>(null);
   const buzzerRef = React.useRef<HTMLAudioElement | null>(null);
@@ -26,7 +27,7 @@ export const ObsOverlay: React.FC = () => {
   }, []);
 
   const playSound = (type: 'whistle' | 'buzzer') => {
-    if (!audioEnabled) return;
+    if (!audioEnabled || !tournamentAudio) return;
     const audio = type === 'whistle' ? whistleRef.current : buzzerRef.current;
     if (audio) {
       audio.currentTime = 0;
@@ -69,6 +70,15 @@ export const ObsOverlay: React.FC = () => {
           currentRaidSeconds = Math.max(0, currentRaidSeconds - elapsed);
         }
         setRaidTimer(currentRaidSeconds);
+
+        // Fetch tournament audio setting if applicable
+        if (data.tournamentId) {
+          onValue(ref(db, `tournaments/${data.tournamentId}/audioEnabled`), (snap) => {
+            if (snap.exists()) {
+              setTournamentAudio(snap.val());
+            }
+          });
+        }
       }
     });
 

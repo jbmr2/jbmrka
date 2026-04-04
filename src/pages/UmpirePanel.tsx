@@ -145,6 +145,16 @@ export const UmpirePanel: React.FC = () => {
 
         // Sync raiding team
         setRaidingTeam(data.raidingTeam || null);
+
+        // Sync sound enabled state with tournament setting if match belongs to a tournament
+        if (data.tournamentId) {
+          const tournamentRef = ref(db, `tournaments/${data.tournamentId}/audioEnabled`);
+          get(tournamentRef).then(snap => {
+            if (snap.exists()) {
+              setSoundEnabled(snap.val());
+            }
+          });
+        }
       }
     });
 
