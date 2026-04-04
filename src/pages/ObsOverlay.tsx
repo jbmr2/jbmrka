@@ -151,13 +151,12 @@ export const ObsOverlay: React.FC = () => {
 
   return (
     <div className="w-screen h-screen bg-transparent overflow-hidden font-sans relative">
-      {/* Audio Enable Overlay */}
+      {/* Hidden Audio Enable Overlay */}
       {!audioEnabled && (
         <button 
           onClick={() => setAudioEnabled(true)}
-          className="fixed top-4 right-4 z-[200] bg-indigo-600/80 hover:bg-indigo-600 text-white px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest shadow-xl transition-all border border-white/20 backdrop-blur-sm"
+          className="fixed inset-0 z-[200] bg-transparent cursor-pointer"
         >
-          Enable Broadcast Audio
         </button>
       )}
 

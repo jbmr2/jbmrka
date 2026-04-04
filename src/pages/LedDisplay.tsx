@@ -150,13 +150,12 @@ export const LedDisplay: React.FC = () => {
 
   return (
     <div className="w-screen h-screen bg-black overflow-hidden font-mono select-none flex flex-col p-6 text-white relative">
-      {/* Audio Enable Overlay */}
+      {/* Hidden Audio Enable Overlay */}
       {!audioEnabled && (
         <button 
           onClick={() => setAudioEnabled(true)}
-          className="fixed top-4 right-4 z-[200] bg-yellow-500 text-black px-6 py-2 rounded-lg text-sm font-black uppercase tracking-widest shadow-[0_0_20px_rgba(234,179,8,0.4)] transition-all animate-pulse"
+          className="fixed inset-0 z-[200] bg-transparent cursor-pointer"
         >
-          Activate Audio
         </button>
       )}
       
