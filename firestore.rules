@@ -1,0 +1,265 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {userId}
+    // Fields:
+    //   - uid: string (required)
+    //   - email: string (required)
+    //   - displayName: string (optional)
+    //   - createdAt: string (required)
+    //
+    // Collection: tournaments
+    // Document ID: {tournamentId}
+    // Fields:
+    //   - name: string (required, < 100 chars)
+    //   - location: string (optional, < 100 chars)
+    //   - startDate: string (optional)
+    //   - endDate: string (optional)
+    //   - ownerId: string (required)
+    //   - createdAt: string (required)
+    //
+    // Collection: teams
+    // Document ID: {teamId}
+    // Fields:
+    //   - name: string (required, < 100 chars)
+    //   - shortName: string (optional, < 10 chars)
+    //   - tournamentId: string (required)
+    //   - ownerId: string (required)
+    //   - createdAt: string (required)
+    //
+    // Collection: players
+    // Document ID: {playerId}
+    // Fields:
+    //   - name: string (required, < 100 chars)
+    //   - jerseyNumber: number (optional)
+    //   - role: string (optional)
+    //   - teamId: string (required)
+    //   - tournamentId: string (required)
+    //   - ownerId: string (required)
+    //   - createdAt: string (required)
+    //
+    // Collection: matches
+    // Document ID: {matchId}
+    // Fields:
+    //   - tournamentId: string (required)
+    //   - teamAId: string (required)
+    //   - teamBId: string (required)
+    //   - teamAName: string (optional)
+    //   - teamBName: string (optional)
+    //   - teamAScore: number (optional)
+    //   - teamBScore: number (optional)
+    //   - status: string (optional)
+    //   - timerSeconds: number (optional)
+    //   - isTimerRunning: boolean (optional)
+    //   - ownerId: string (required)
+    //   - createdAt: string (required)
+    //   - updatedAt: string (optional)
+    //
+    // Collection: matches/{matchId}/raids
+    // Document ID: {raidId}
+    // Fields:
+    //   - matchId: string (required)
+    //   - raiderId: string (optional)
+    //   - raiderName: string (optional)
+    //   - attackingTeamId: string (required)
+    //   - defendingTeamId: string (required)
+    //   - raidResult: string (required)
+    //   - touchPoints: number (optional)
+    //   - bonusPoints: number (optional)
+    //   - tacklePoints: number (optional)
+    //   - allOutPoints: number (optional)
+    //   - extraPoints: number (optional)
+    //   - totalPointsScored: number (optional)
+    //   - scoringTeamId: string (optional)
+    //   - half: string (optional)
+    //   - timestamp: string (required)
+    //   - ownerId: string (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.ownerId;
+    }
+
+    function uidUnchanged() {
+      return !('uid' in request.resource.data) || request.resource.data.uid == request.auth.uid;
+    }
+
+    function ownerIdUnchanged() {
+      return !('ownerId' in request.resource.data) || request.resource.data.ownerId == request.auth.uid;
+    }
+
+    function ownerIdNotModified() {
+      return !('ownerId' in request.resource.data) || request.resource.data.ownerId == resource.data.ownerId;
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function validStringLength(field, minLen, maxLen) {
+      return request.resource.data[field] is string &&
+        request.resource.data[field].size() >= minLen &&
+        request.resource.data[field].size() <= maxLen;
+    }
+
+    function isValidOptionalString(field, minLen, maxLen) {
+      return !(field in request.resource.data) ||
+             (request.resource.data[field] is string &&
+              request.resource.data[field].size() >= minLen &&
+              request.resource.data[field].size() <= maxLen);
+    }
+
+    function isValidOptionalNumber(field) {
+      return !(field in request.resource.data) || request.resource.data[field] is number;
+    }
+
+    function isValidOptionalBoolean(field) {
+      return !(field in request.resource.data) || request.resource.data[field] is bool;
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser() {
+      return hasRequiredFields(['uid', 'email', 'createdAt']) &&
+             request.resource.data.uid == request.auth.uid &&
+             request.resource.data.email is string &&
+             request.resource.data.createdAt is string &&
+             isValidOptionalString('displayName', 0, 100);
+    }
+
+    function isValidTournament() {
+      return hasRequiredFields(['name', 'ownerId', 'createdAt']) &&
+             validStringLength('name', 1, 100) &&
+             request.resource.data.ownerId == request.auth.uid &&
+             request.resource.data.createdAt is string &&
+             isValidOptionalString('location', 0, 100) &&
+             isValidOptionalString('startDate', 0, 50) &&
+             isValidOptionalString('endDate', 0, 50);
+    }
+
+    function isValidTeam() {
+      return hasRequiredFields(['name', 'tournamentId', 'ownerId', 'createdAt']) &&
+             validStringLength('name', 1, 100) &&
+             validStringLength('tournamentId', 1, 100) &&
+             request.resource.data.ownerId == request.auth.uid &&
+             request.resource.data.createdAt is string &&
+             isValidOptionalString('shortName', 0, 10);
+    }
+
+    function isValidPlayer() {
+      return hasRequiredFields(['name', 'teamId', 'tournamentId', 'ownerId', 'createdAt']) &&
+             validStringLength('name', 1, 100) &&
+             validStringLength('teamId', 1, 100) &&
+             validStringLength('tournamentId', 1, 100) &&
+             request.resource.data.ownerId == request.auth.uid &&
+             request.resource.data.createdAt is string &&
+             isValidOptionalNumber('jerseyNumber') &&
+             isValidOptionalString('role', 0, 50);
+    }
+
+    function isValidMatch() {
+      return hasRequiredFields(['tournamentId', 'teamAId', 'teamBId', 'ownerId', 'createdAt']) &&
+             validStringLength('tournamentId', 1, 100) &&
+             validStringLength('teamAId', 1, 100) &&
+             validStringLength('teamBId', 1, 100) &&
+             request.resource.data.ownerId == request.auth.uid &&
+             request.resource.data.createdAt is string &&
+             isValidOptionalString('teamAName', 0, 100) &&
+             isValidOptionalString('teamBName', 0, 100) &&
+             isValidOptionalNumber('teamAScore') &&
+             isValidOptionalNumber('teamBScore') &&
+             isValidOptionalString('status', 0, 50) &&
+             isValidOptionalNumber('timerSeconds') &&
+             isValidOptionalBoolean('isTimerRunning') &&
+             isValidOptionalString('updatedAt', 0, 50);
+    }
+
+    function isValidRaid() {
+      return hasRequiredFields(['matchId', 'attackingTeamId', 'defendingTeamId', 'raidResult', 'timestamp', 'ownerId']) &&
+             validStringLength('matchId', 1, 100) &&
+             validStringLength('attackingTeamId', 1, 100) &&
+             validStringLength('defendingTeamId', 1, 100) &&
+             validStringLength('raidResult', 1, 50) &&
+             request.resource.data.ownerId == request.auth.uid &&
+             request.resource.data.timestamp is string &&
+             isValidOptionalString('raiderId', 0, 100) &&
+             isValidOptionalString('raiderName', 0, 100) &&
+             isValidOptionalNumber('touchPoints') &&
+             isValidOptionalNumber('bonusPoints') &&
+             isValidOptionalNumber('tacklePoints') &&
+             isValidOptionalNumber('allOutPoints') &&
+             isValidOptionalNumber('extraPoints') &&
+             isValidOptionalNumber('totalPointsScored') &&
+             isValidOptionalString('scoringTeamId', 0, 100) &&
+             isValidOptionalString('half', 0, 50);
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser() && uidUnchanged();
+      allow update: if isOwner(userId) && isValidUser() && uidUnchanged();
+    }
+
+    match /tournaments/{tournamentId} {
+      allow read: if isDocOwner();
+      allow create: if isAuthenticated() && isValidTournament() && ownerIdUnchanged();
+      allow update: if isDocOwner() && isValidTournament() && ownerIdNotModified() &&
+                    request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if isDocOwner();
+    }
+
+    match /teams/{teamId} {
+      allow read: if isDocOwner();
+      allow create: if isAuthenticated() && isValidTeam() && ownerIdUnchanged();
+      allow update: if isDocOwner() && isValidTeam() && ownerIdNotModified() &&
+                    request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if isDocOwner();
+    }
+
+    match /players/{playerId} {
+      allow read: if isDocOwner();
+      allow create: if isAuthenticated() && isValidPlayer() && ownerIdUnchanged();
+      allow update: if isDocOwner() && isValidPlayer() && ownerIdNotModified() &&
+                    request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if isDocOwner();
+    }
+
+    match /matches/{matchId} {
+      allow read: if isDocOwner();
+      allow create: if isAuthenticated() && isValidMatch() && ownerIdUnchanged();
+      allow update: if isDocOwner() && isValidMatch() && ownerIdNotModified() &&
+                    request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if isDocOwner();
+
+      match /raids/{raidId} {
+        allow read: if isDocOwner();
+        allow create: if isAuthenticated() && isValidRaid() && ownerIdUnchanged();
+        allow update: if isDocOwner() && isValidRaid() && ownerIdNotModified();
+        allow delete: if isDocOwner();
+      }
+    }
+  }
+}

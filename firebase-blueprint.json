@@ -1,0 +1,129 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Profile information for a registered user.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "createdAt"]
+    },
+    "Tournament": {
+      "title": "Tournament",
+      "description": "A Kabaddi tournament.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "location": { "type": "string" },
+        "startDate": { "type": "string", "format": "date-time" },
+        "endDate": { "type": "string", "format": "date-time" },
+        "ownerId": { "type": "string", "description": "UID of the user who created this tournament" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "ownerId", "createdAt"]
+    },
+    "Team": {
+      "title": "Team",
+      "description": "A Kabaddi team participating in a tournament.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "shortName": { "type": "string" },
+        "tournamentId": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "tournamentId", "ownerId", "createdAt"]
+    },
+    "Player": {
+      "title": "Player",
+      "description": "A player belonging to a team.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "jerseyNumber": { "type": "number" },
+        "role": { "type": "string", "enum": ["Raider", "Defender", "All-Rounder"] },
+        "teamId": { "type": "string" },
+        "tournamentId": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "teamId", "tournamentId", "ownerId", "createdAt"]
+    },
+    "Match": {
+      "title": "Match",
+      "description": "A Kabaddi match between two teams.",
+      "type": "object",
+      "properties": {
+        "tournamentId": { "type": "string" },
+        "teamAId": { "type": "string" },
+        "teamBId": { "type": "string" },
+        "teamAName": { "type": "string" },
+        "teamBName": { "type": "string" },
+        "teamAScore": { "type": "number" },
+        "teamBScore": { "type": "number" },
+        "status": { "type": "string", "enum": ["Scheduled", "First Half", "Half Time", "Second Half", "Completed"] },
+        "timerSeconds": { "type": "number" },
+        "isTimerRunning": { "type": "boolean" },
+        "ownerId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["tournamentId", "teamAId", "teamBId", "ownerId", "createdAt"]
+    },
+    "Raid": {
+      "title": "Raid",
+      "description": "Data for a single raid in a match.",
+      "type": "object",
+      "properties": {
+        "matchId": { "type": "string" },
+        "raiderId": { "type": "string" },
+        "raiderName": { "type": "string" },
+        "attackingTeamId": { "type": "string" },
+        "defendingTeamId": { "type": "string" },
+        "raidResult": { "type": "string", "enum": ["Empty", "Successful", "Unsuccessful", "Super Raid"] },
+        "touchPoints": { "type": "number" },
+        "bonusPoints": { "type": "number" },
+        "tacklePoints": { "type": "number" },
+        "allOutPoints": { "type": "number" },
+        "extraPoints": { "type": "number" },
+        "totalPointsScored": { "type": "number" },
+        "scoringTeamId": { "type": "string" },
+        "half": { "type": "string", "enum": ["First Half", "Second Half"] },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "ownerId": { "type": "string" }
+      },
+      "required": ["matchId", "attackingTeamId", "defendingTeamId", "raidResult", "timestamp", "ownerId"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "User profiles"
+    },
+    "/tournaments/{tournamentId}": {
+      "schema": { "$ref": "#/entities/Tournament" },
+      "description": "Tournaments created by users"
+    },
+    "/teams/{teamId}": {
+      "schema": { "$ref": "#/entities/Team" },
+      "description": "Teams in tournaments"
+    },
+    "/players/{playerId}": {
+      "schema": { "$ref": "#/entities/Player" },
+      "description": "Players in teams"
+    },
+    "/matches/{matchId}": {
+      "schema": { "$ref": "#/entities/Match" },
+      "description": "Matches in tournaments"
+    },
+    "/matches/{matchId}/raids/{raidId}": {
+      "schema": { "$ref": "#/entities/Raid" },
+      "description": "Raid-by-raid events for a match"
+    }
+  }
+}
