@@ -47,6 +47,7 @@ export const TournamentDetails: React.FC = () => {
     matchDate: new Date().toISOString().slice(0, 16) // Default to now
   });
   const [matchToDelete, setMatchToDelete] = useState<string | null>(null);
+  const [isDeletingTournament, setIsDeletingTournament] = useState(false);
 
   const confirmDeleteMatch = async () => {
     if (!matchToDelete) return;
@@ -55,6 +56,16 @@ export const TournamentDetails: React.FC = () => {
       setMatchToDelete(null);
     } catch (error) {
       console.error("Error deleting match:", error);
+    }
+  };
+
+  const handleDeleteTournament = async () => {
+    if (!id || !user) return;
+    try {
+      await remove(ref(db, `tournaments/${id}`));
+      navigate('/');
+    } catch (error) {
+      console.error("Error deleting tournament:", error);
     }
   };
 
@@ -283,6 +294,14 @@ export const TournamentDetails: React.FC = () => {
             Bracket
           </button>
         </div>
+
+        <button 
+          onClick={() => setIsDeletingTournament(true)}
+          className="p-2 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+          title="Delete Tournament"
+        >
+          <Trash2 className="w-5 h-5" />
+        </button>
       </div>
 
       {activeTab === 'matches' && (
@@ -562,6 +581,34 @@ export const TournamentDetails: React.FC = () => {
             <div className="flex justify-end gap-3">
               <button onClick={() => setMatchToDelete(null)} className="px-6 py-2 text-xs font-black uppercase text-slate-400 hover:text-slate-800 transition-colors">Cancel</button>
               <button onClick={confirmDeleteMatch} className="px-8 py-3 bg-red-600 text-white rounded-2xl text-xs font-black uppercase hover:bg-red-700 transition-all shadow-lg">Delete Permanently</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isDeletingTournament && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-[32px] p-8 max-w-md w-full shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-200">
+            <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mb-6">
+              <AlertTriangle className="w-8 h-8 text-red-600" />
+            </div>
+            <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight mb-2">Delete Tournament?</h3>
+            <p className="text-slate-500 font-medium italic mb-8">
+              This action cannot be undone. All data for "{tournament.name}" will be permanently removed.
+            </p>
+            <div className="flex gap-4">
+              <button
+                onClick={() => setIsDeletingTournament(false)}
+                className="flex-1 px-6 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-200 transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteTournament}
+                className="flex-1 px-6 py-4 bg-red-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-red-200 hover:bg-red-700 transition-all"
+              >
+                Delete
+              </button>
             </div>
           </div>
         </div>
