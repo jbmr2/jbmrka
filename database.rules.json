@@ -15,6 +15,11 @@
       ".write": "auth != null",
       ".indexOn": ["tournamentId", "ownerId"]
     },
+    "players": {
+      ".read": true,
+      ".write": "auth != null",
+      ".indexOn": ["teamId", "ownerId"]
+    },
     "users": {
       ".read": "auth != null",
       ".write": "auth != null"

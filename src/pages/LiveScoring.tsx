@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ref, onValue, push, set, query, orderByChild, equalTo, get, update } from 'firebase/database';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
-import { ArrowLeft, Play, Pause, Square, Activity, History, Minus, Plus, Timer, RotateCcw, Users, Edit2, Check, ArrowRightLeft } from 'lucide-react';
+import { ArrowLeft, Activity, History, Minus, Plus, RotateCcw, Users, Edit2, Check, ArrowRightLeft } from 'lucide-react';
 import { SubstitutionModal } from '../components/SubstitutionModal';
 
 export const LiveScoring: React.FC = () => {
@@ -14,19 +14,10 @@ export const LiveScoring: React.FC = () => {
   const [match, setMatch] = useState<any>(null);
   const [raids, setRaids] = useState<any[]>([]);
   const [players, setPlayers] = useState<any[]>([]);
-  const [timerSeconds, setTimerSeconds] = useState(0);
-  const [isTimerRunning, setIsTimerRunning] = useState(false);
-  const [isEditingTimer, setIsEditingTimer] = useState(false);
-  const [editMinutes, setEditMinutes] = useState('45');
-  const [editSeconds, setEditSeconds] = useState('00');
   const [currentHalf, setCurrentHalf] = useState('First Half');
   const [isSubModalOpen, setIsSubModalOpen] = useState(false);
-  const [raidTimer, setRaidTimer] = useState(30);
-  const [isRaidTimerRunning, setIsRaidTimerRunning] = useState(false);
   const [editingRaidId, setEditingRaidId] = useState<string | null>(null);
   
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const raidTimerRef = useRef<NodeJS.Timeout | null>(null);
   const serverOffsetRef = useRef<number>(0);
 
   // Sync with server time offset
@@ -54,26 +45,6 @@ export const LiveScoring: React.FC = () => {
         const data = snapshot.val();
         setMatch({ id: snapshot.key, ...data });
         
-        if (!isTimerRunning) {
-          let currentSeconds = data.timerSeconds !== undefined ? data.timerSeconds : (data.initialTimerSeconds || 2700);
-          if (data.isTimerRunning && data.timerUpdatedAt) {
-            const elapsed = Math.floor((getServerTime() - data.timerUpdatedAt) / 1000);
-            currentSeconds = Math.max(0, currentSeconds - elapsed);
-          }
-          setTimerSeconds(currentSeconds);
-          setIsTimerRunning(data.isTimerRunning || false);
-        }
-
-        if (!isRaidTimerRunning) {
-          let currentRaidSeconds = data.raidTimerSeconds !== undefined ? data.raidTimerSeconds : 30;
-          if (data.isRaidTimerRunning && data.raidTimerUpdatedAt) {
-            const elapsed = Math.floor((getServerTime() - data.raidTimerUpdatedAt) / 1000);
-            currentRaidSeconds = Math.max(0, currentRaidSeconds - elapsed);
-          }
-          setRaidTimer(currentRaidSeconds);
-          setIsRaidTimerRunning(data.isRaidTimerRunning || false);
-        }
-        
         if (data.status === 'Second Half') setCurrentHalf('Second Half');
         else if (data.status === 'First Half') setCurrentHalf('First Half');
       } else {
@@ -99,7 +70,6 @@ export const LiveScoring: React.FC = () => {
     return () => {
       unsubMatch();
       unsubRaids();
-      if (timerRef.current) clearInterval(timerRef.current);
     };
   }, [id, user, navigate]);
 
@@ -122,104 +92,6 @@ export const LiveScoring: React.FC = () => {
     });
     return () => unsub();
   }, [matchId, teamAId, teamBId]);
-
-  // Timer logic
-  useEffect(() => {
-    if (isTimerRunning) {
-      timerRef.current = setInterval(() => {
-        setTimerSeconds(prev => {
-          if (prev <= 1) {
-            setIsTimerRunning(false);
-            if (timerRef.current) clearInterval(timerRef.current);
-            if (id) {
-              update(ref(db, `matches/${id}`), {
-                isTimerRunning: false,
-                timerSeconds: 0,
-                timerUpdatedAt: getServerTime()
-              }).catch(console.error);
-            }
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    } else if (timerRef.current) {
-      clearInterval(timerRef.current);
-    }
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [isTimerRunning, id]);
-
-  // Raid timer logic
-  useEffect(() => {
-    if (isRaidTimerRunning) {
-      raidTimerRef.current = setInterval(() => {
-        setRaidTimer(prev => {
-          if (prev <= 1) {
-            setIsRaidTimerRunning(false);
-            if (raidTimerRef.current) clearInterval(raidTimerRef.current);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    } else if (raidTimerRef.current) {
-      clearInterval(raidTimerRef.current);
-    }
-    return () => {
-      if (raidTimerRef.current) clearInterval(raidTimerRef.current);
-    };
-  }, [isRaidTimerRunning]);
-
-  // Sync timer to Realtime DB every 5 seconds if running
-  useEffect(() => {
-    if (!id || !isTimerRunning) return;
-    const syncInterval = setInterval(() => {
-      update(ref(db, `matches/${id}`), {
-        timerSeconds: timerSeconds,
-        timerUpdatedAt: getServerTime(),
-        isTimerRunning: true
-      }).catch(e => console.error("Timer sync error", e));
-    }, 5000);
-    return () => clearInterval(syncInterval);
-  }, [id, isTimerRunning, timerSeconds]);
-
-  const toggleTimer = async () => {
-    if (!match) return;
-    const newState = !isTimerRunning;
-    setIsTimerRunning(newState);
-    try {
-      await update(ref(db, `matches/${id}`), {
-        isTimerRunning: newState,
-        timerSeconds: timerSeconds,
-        timerUpdatedAt: getServerTime(),
-        status: match.status === 'Scheduled' ? 'First Half' : match.status
-      });
-    } catch (error) {
-      console.error("Error updating timer:", error);
-    }
-  };
-
-  const formatTime = (seconds: number) => {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-  };
-
-  const saveManualTimer = async () => {
-    const m = parseInt(editMinutes) || 0;
-    const s = parseInt(editSeconds) || 0;
-    const newSeconds = (m * 60) + s;
-    setTimerSeconds(newSeconds);
-    setIsEditingTimer(false);
-    if (id) {
-      await update(ref(db, `matches/${id}`), {
-        timerSeconds: newSeconds,
-        timerUpdatedAt: getServerTime()
-      });
-    }
-  };
 
   const adjustScore = async (team: 'A' | 'B', delta: number) => {
     if (!match || !id || !user) return;
@@ -267,10 +139,6 @@ export const LiveScoring: React.FC = () => {
     if (!match || !id) return;
     try {
       const updates: any = { status: newStatus, updatedAt: new Date().toISOString() };
-      if (newStatus === 'Completed' && isTimerRunning) {
-        updates.isTimerRunning = false;
-        setIsTimerRunning(false);
-      }
       await update(ref(db, `matches/${id}`), updates);
     } catch (error) {
       console.error("Error updating match status:", error);
@@ -286,10 +154,10 @@ export const LiveScoring: React.FC = () => {
     }
   };
 
-  const recordRaid = async (attackingTeamId: string, defendingTeamId: string, result: string, points: any, raiderId: string, outDefenderIds: string[] = []) => {
+  const recordRaid = async (attackingTeamId: string, defendingTeamId: string, result: string, points: any, raiderId: string, outDefenderIds: string[] = [], selfOutIds: string[] = []) => {
     if (!match || !user || !id) return;
 
-    const { touch = 0, bonus = 0, tackle = 0, allOut = 0, extra = 0 } = points;
+    const { touch = 0, bonus = 0, tackle = 0, technical = 0, allOut = 0, extra = 0 } = points;
     
     // Calculate who gets points
     let teamAScoreAdd = 0;
@@ -303,8 +171,24 @@ export const LiveScoring: React.FC = () => {
       teamAScoreAdd += tackle;
     }
 
-    // All out points go to the team that inflicted it (usually the one scoring tackle or touch that wipes the team)
-    // For simplicity in UI, we'll just assign it based on who we say scored it.
+    // Technical points belong to the scoring team
+    if (technical > 0 && points.scoringTeamId) {
+      if (points.scoringTeamId === match.teamAId) teamAScoreAdd += technical;
+      else if (points.scoringTeamId === match.teamBId) teamBScoreAdd += technical;
+    }
+
+    // Self Out points go to the opponent team
+    if (selfOutIds && selfOutIds.length > 0) {
+      selfOutIds.forEach(pid => {
+        const player = players.find(p => p.id === pid);
+        if (player) {
+          if (player.teamId === match.teamAId) teamBScoreAdd += 1;
+          else teamAScoreAdd += 1;
+        }
+      });
+    }
+
+    // All out points go to the team that inflicted it
     if (allOut > 0) {
       if (points.scoringTeamId === match.teamAId) teamAScoreAdd += allOut;
       if (points.scoringTeamId === match.teamBId) teamBScoreAdd += allOut;
@@ -315,11 +199,11 @@ export const LiveScoring: React.FC = () => {
       if (points.scoringTeamId === match.teamBId) teamBScoreAdd += extra;
     }
 
-    const totalPointsScored = touch + bonus + tackle + allOut + extra;
+    const totalPointsScored = touch + bonus + tackle + allOut + extra + technical;
 
     let newLineup = match.lineup ? JSON.parse(JSON.stringify(match.lineup)) : null;
     
-    if (newLineup && raiderId) {
+    if (newLineup) {
       const attTeamKey = attackingTeamId === match.teamAId ? 'teamA' : 'teamB';
       const defTeamKey = defendingTeamId === match.teamAId ? 'teamA' : 'teamB';
       
@@ -330,7 +214,29 @@ export const LiveScoring: React.FC = () => {
 
       let revivedCount = 0;
 
-      if (result === 'Unsuccessful') {
+      // Self Out handling
+      if (selfOutIds && selfOutIds.length > 0) {
+        selfOutIds.forEach(pid => {
+          const player = players.find(p => p.id === pid);
+          if (player) {
+            const teamKey = player.teamId === match.teamAId ? 'teamA' : 'teamB';
+            const oppTeamKey = player.teamId === match.teamAId ? 'teamB' : 'teamA';
+            
+            if (newLineup[teamKey].onMat.includes(pid)) {
+              newLineup[teamKey].onMat = newLineup[teamKey].onMat.filter((id: string) => id !== pid);
+              newLineup[teamKey].out.push(pid);
+              
+              // Opposition gets revival
+              if (newLineup[oppTeamKey].out.length > 0) {
+                const revivedId = newLineup[oppTeamKey].out.shift();
+                newLineup[oppTeamKey].onMat.push(revivedId);
+              }
+            }
+          }
+        });
+      }
+
+      if (result === 'Unsuccessful' && raiderId) {
         // Raider is out
         newLineup[attTeamKey].onMat = newLineup[attTeamKey].onMat.filter((pid: string) => pid !== raiderId);
         newLineup[attTeamKey].out.push(raiderId);
@@ -381,9 +287,11 @@ export const LiveScoring: React.FC = () => {
         touchPoints: touch,
         bonusPoints: bonus,
         tacklePoints: tackle,
+        technicalPoints: technical,
         allOutPoints: allOut,
         extraPoints: extra,
         totalPointsScored,
+        selfOutIds,
         half: currentHalf,
         timestamp: new Date().toISOString(),
         ownerId: user.uid,
@@ -397,12 +305,9 @@ export const LiveScoring: React.FC = () => {
       const newRaidRef = push(ref(db, `matches/${id}/raids`));
       await set(newRaidRef, raidData);
 
-      // 2. Update Match Score, Lineup, and Reset Raid Timer
+      // 2. Update Match Score and Lineup
       const matchUpdates: any = {
-        updatedAt: new Date().toISOString(),
-        isRaidTimerRunning: false,
-        raidTimerSeconds: 30,
-        raidTimerUpdatedAt: Date.now()
+        updatedAt: new Date().toISOString()
       };
       
       if (teamAScoreAdd > 0 || teamBScoreAdd > 0) {
@@ -530,7 +435,7 @@ export const LiveScoring: React.FC = () => {
             className="text-sm font-bold px-4 py-1.5 bg-yellow-100 text-yellow-800 hover:bg-yellow-200 rounded-full transition-colors flex items-center gap-1 shadow-sm border border-yellow-200"
             title="Open LED Ticker Display in new tab"
           >
-            <Timer className="w-4 h-4" /> LED Display
+            <Activity className="w-4 h-4" /> LED Display
           </Link>
           <select
             value={match.status || 'Scheduled'}
@@ -546,7 +451,7 @@ export const LiveScoring: React.FC = () => {
         </div>
       </div>
 
-      {/* Scoreboard & Timer */}
+      {/* Scoreboard */}
       <div className="bg-slate-900 rounded-2xl p-4 md:p-6 shadow-xl text-white relative overflow-hidden">
         {/* Decorative background elements */}
         <div className="absolute top-0 left-0 w-full h-full overflow-hidden opacity-10 pointer-events-none">
@@ -555,123 +460,10 @@ export const LiveScoring: React.FC = () => {
         </div>
 
         <div className="relative z-10 flex flex-col items-center">
-          {/* Timer */}
+          {/* Status Display */}
           <div className="mb-4 flex flex-col items-center">
-            {isEditingTimer ? (
-              <div className="flex items-center gap-2 mb-2">
-                <input
-                  type="number"
-                  min="0"
-                  max="99"
-                  value={editMinutes}
-                  onChange={(e) => setEditMinutes(e.target.value)}
-                  className="w-16 text-center text-3xl font-black font-mono bg-slate-800 text-white border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-                <span className="text-3xl font-black text-white">:</span>
-                <input
-                  type="number"
-                  min="0"
-                  max="59"
-                  value={editSeconds}
-                  onChange={(e) => setEditSeconds(e.target.value)}
-                  className="w-16 text-center text-3xl font-black font-mono bg-slate-800 text-white border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-                <button
-                  onClick={saveManualTimer}
-                  className="ml-2 p-2 bg-green-500 hover:bg-green-600 text-white rounded-full transition-colors"
-                  title="Save Timer"
-                >
-                  <Check className="w-5 h-5" />
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-4">
-                <div className="text-4xl md:text-5xl font-black tracking-tighter font-mono text-white drop-shadow-lg">
-                  {formatTime(timerSeconds)}
-                </div>
-                <button
-                  onClick={() => {
-                    if (isTimerRunning) toggleTimer();
-                    setEditMinutes(Math.floor(timerSeconds / 60).toString().padStart(2, '0'));
-                    setEditSeconds((timerSeconds % 60).toString().padStart(2, '0'));
-                    setIsEditingTimer(true);
-                  }}
-                  className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors border border-white/20"
-                  title="Edit Timer"
-                >
-                  <Edit2 className="w-4 h-4" />
-                </button>
-              </div>
-            )}
-            <div className="flex gap-4 mt-3">
-              <button
-                onClick={toggleTimer}
-                className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm transition-all ${
-                  isTimerRunning 
-                    ? 'bg-red-500 hover:bg-red-600 text-white shadow-[0_0_15px_rgba(239,68,68,0.5)]' 
-                    : 'bg-green-500 hover:bg-green-600 text-white shadow-[0_0_15px_rgba(34,197,94,0.5)]'
-                }`}
-              >
-                {isTimerRunning ? <><Pause className="w-4 h-4" /> Pause</> : <><Play className="w-4 h-4" /> Start</>}
-              </button>
-              <button
-                onClick={async () => {
-                  setIsTimerRunning(false);
-                  const resetSeconds = match.initialTimerSeconds || 2700;
-                  setTimerSeconds(resetSeconds);
-                  if (id) {
-                    await update(ref(db, `matches/${id}`), {
-                      isTimerRunning: false,
-                      timerSeconds: resetSeconds,
-                      timerUpdatedAt: Date.now()
-                    });
-                  }
-                }}
-                className="flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm bg-slate-700 hover:bg-slate-600 text-white transition-all"
-                title={`Reset to ${Math.floor((match.initialTimerSeconds || 2700) / 60)}:00`}
-              >
-                <RotateCcw className="w-4 h-4" /> Reset
-              </button>
-            </div>
-
-            {/* Raid Timer Display */}
-            <div className="mt-6 flex flex-col items-center p-3 bg-white/5 rounded-2xl border border-white/10 w-full max-w-[200px]">
-              <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-orange-400 mb-1">Raid Clock</div>
-              <div className={`text-4xl font-mono font-black ${raidTimer <= 5 ? 'text-red-500 animate-pulse' : 'text-white'}`}>
-                {raidTimer}
-              </div>
-              <div className="flex gap-2 mt-2">
-                <button
-                  onClick={async () => {
-                    const newState = !isRaidTimerRunning;
-                    setIsRaidTimerRunning(newState);
-                    if (id) {
-                      await update(ref(db, `matches/${id}`), {
-                        isRaidTimerRunning: newState,
-                        raidTimerSeconds: raidTimer,
-                        raidTimerUpdatedAt: Date.now()
-                      });
-                    }
-                  }}
-                  className={`p-1.5 rounded-full transition-all ${isRaidTimerRunning ? 'bg-orange-500 text-white' : 'bg-slate-700 text-slate-300'}`}
-                >
-                  {isRaidTimerRunning ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
-                </button>
-                <button
-                  onClick={async () => {
-                    setRaidTimer(30);
-                    if (id) {
-                      await update(ref(db, `matches/${id}`), {
-                        raidTimerSeconds: 30,
-                        raidTimerUpdatedAt: Date.now()
-                      });
-                    }
-                  }}
-                  className="p-1.5 bg-slate-700 text-slate-300 rounded-full hover:bg-slate-600 transition-all"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                </button>
-              </div>
+            <div className="px-6 py-2 bg-white/10 rounded-full border border-white/20 shadow-lg">
+              <span className="text-2xl font-black text-white uppercase tracking-[0.3em]">{match.status || 'Scheduled'}</span>
             </div>
           </div>
 
@@ -756,11 +548,6 @@ export const LiveScoring: React.FC = () => {
                       )}
                     </span>
                     <div className="flex items-center gap-2">
-                      {raid.raidDuration !== undefined && (
-                        <span className="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded flex items-center gap-1">
-                          <Timer className="w-3 h-3" /> {raid.raidDuration}s
-                        </span>
-                      )}
                       <span className={`px-2 py-0.5 rounded text-xs font-bold ${
                         raid.raidResult === 'Successful' ? 'bg-green-100 text-green-700' :
                         raid.raidResult === 'Unsuccessful' ? 'bg-red-100 text-red-700' :
@@ -790,8 +577,14 @@ export const LiveScoring: React.FC = () => {
                     {raid.touchPoints > 0 && <span>Touch: {raid.touchPoints}</span>}
                     {raid.bonusPoints > 0 && <span>Bonus: {raid.bonusPoints}</span>}
                     {raid.tacklePoints > 0 && <span>Tackle: {raid.tacklePoints}</span>}
+                    {raid.technicalPoints > 0 && <span>Technical: {raid.technicalPoints}</span>}
                     {raid.allOutPoints > 0 && <span>All Out: {raid.allOutPoints}</span>}
                     {raid.extraPoints !== 0 && raid.extraPoints !== undefined && <span>Points: {raid.extraPoints > 0 ? `+${raid.extraPoints}` : raid.extraPoints}</span>}
+                    {raid.selfOutIds && raid.selfOutIds.length > 0 && (
+                      <span className="text-xs text-red-600 font-bold">
+                        Self Out: {raid.selfOutIds.map((sid: string) => players.find(p => p.id === sid)?.name || sid).join(', ')}
+                      </span>
+                    )}
                   </div>
                 </div>
               ))
@@ -799,15 +592,15 @@ export const LiveScoring: React.FC = () => {
           </div>
         </div>
       </div>
-    </div>
-    
-    <SubstitutionModal
-      isOpen={isSubModalOpen}
-      onClose={() => setIsSubModalOpen(false)}
-      match={match}
-      players={players}
-      onSubstitute={recordSubstitution}
-    />
+      </div>
+      
+      <SubstitutionModal
+        isOpen={isSubModalOpen}
+        onClose={() => setIsSubModalOpen(false)}
+        match={match}
+        players={players}
+        onSubstitute={recordSubstitution}
+      />
     </div>
   );
 };
@@ -951,9 +744,11 @@ const RaidInputPanel: React.FC<{
   const [touchPoints, setTouchPoints] = useState(0);
   const [bonusPoints, setBonusPoints] = useState(0);
   const [tacklePoints, setTacklePoints] = useState(0);
+  const [technicalPoints, setTechnicalPoints] = useState(0);
   const [allOutPoints, setAllOutPoints] = useState(0);
   const [scoringTeamId, setScoringTeamId] = useState<string>('');
   const [outDefenderIds, setOutDefenderIds] = useState<string[]>([]);
+  const [selfOutIds, setSelfOutIds] = useState<string[]>([]);
 
   // Effect to load raid data when editing
   useEffect(() => {
@@ -965,21 +760,17 @@ const RaidInputPanel: React.FC<{
         setTouchPoints(raid.touchPoints || 0);
         setBonusPoints(raid.bonusPoints || 0);
         setTacklePoints(raid.tacklePoints || 0);
+        setTechnicalPoints(raid.technicalPoints || 0);
         setAllOutPoints(raid.allOutPoints || 0);
         setScoringTeamId(raid.scoringTeamId || '');
         setOutDefenderIds(raid.outDefenderIds || []);
-        setHasTimerStarted(true); // Allow recording since it's an edit
+        setSelfOutIds(raid.selfOutIds || []);
       }
     }
   }, [editingRaidId, raids]);
 
-  // Raid Timer State
-  const [raidTimer, setRaidTimer] = useState(30);
-  const [isRaidTimerRunning, setIsRaidTimerRunning] = useState(false);
-  const [hasTimerStarted, setHasTimerStarted] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [showUndoConfirm, setShowUndoConfirm] = useState(false);
-  const raidTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const defendingTeamId = attackingTeamId === teamA.id ? teamB.id : teamA.id;
   
@@ -1007,10 +798,6 @@ const RaidInputPanel: React.FC<{
     if (raiderId) setErrorMessage('');
   }, [raiderId]);
 
-  useEffect(() => {
-    if (hasTimerStarted) setErrorMessage('');
-  }, [hasTimerStarted]);
-
   // Adjust outDefenderIds if touchPoints decreases below selected count
   useEffect(() => {
     if (outDefenderIds.length > touchPoints) {
@@ -1026,88 +813,42 @@ const RaidInputPanel: React.FC<{
     }
   };
 
-  // Raid Timer Logic
-  useEffect(() => {
-    if (isRaidTimerRunning && raidTimer > 0) {
-      raidTimerRef.current = setInterval(() => {
-        setRaidTimer(prev => prev - 1);
-      }, 1000);
-    } else if (raidTimer === 0) {
-      setIsRaidTimerRunning(false);
-      if (raidTimerRef.current) clearInterval(raidTimerRef.current);
+  const toggleSelfOut = (id: string) => {
+    if (selfOutIds.includes(id)) {
+      setSelfOutIds(selfOutIds.filter(d => d !== id));
     } else {
-      if (raidTimerRef.current) clearInterval(raidTimerRef.current);
+      setSelfOutIds([...selfOutIds, id]);
     }
-    return () => {
-      if (raidTimerRef.current) clearInterval(raidTimerRef.current);
-    };
-  }, [isRaidTimerRunning, raidTimer]);
-
-  // Sync raid timer to Firebase for OBS overlay (only when state changes)
-  useEffect(() => {
-    if (match?.id) {
-      update(ref(db, `matches/${match.id}`), {
-        raidTimerSeconds: raidTimer,
-        isRaidTimerRunning,
-        raidTimerUpdatedAt: Date.now()
-      }).catch(e => console.error("Error syncing raid timer:", e));
-    }
-  }, [isRaidTimerRunning, match?.id]); // Removed raidTimer from dependencies so it only syncs on start/stop
-
-  const resetRaidTimer = () => {
-    setRaidTimer(30);
-    setIsRaidTimerRunning(false);
-    setHasTimerStarted(false);
-    
-    // Force sync on reset
-    if (match?.id) {
-      update(ref(db, `matches/${match.id}`), {
-        raidTimerSeconds: 30,
-        isRaidTimerRunning: false,
-        raidTimerUpdatedAt: Date.now()
-      }).catch(e => console.error("Error syncing raid timer reset:", e));
-    }
-  };
-
-  const toggleRaidTimer = () => {
-    if (raidTimer === 0) setRaidTimer(30);
-    if (!isRaidTimerRunning) setHasTimerStarted(true);
-    setIsRaidTimerRunning(!isRaidTimerRunning);
   };
 
   const resetForm = () => {
     setTouchPoints(0);
     setBonusPoints(0);
     setTacklePoints(0);
+    setTechnicalPoints(0);
     setAllOutPoints(0);
     setScoringTeamId('');
     setRaiderId('');
     setOutDefenderIds([]);
+    setSelfOutIds([]);
     setErrorMessage('');
   };
 
   const handleRecord = (result: string) => {
-    if (!raiderId) {
-      setErrorMessage('Please select a raider before recording the raid.');
-      return;
-    }
-    if (!hasTimerStarted) {
-      setErrorMessage('Please start the 30-second raid timer before recording.');
-      return;
-    }
-
     onRecordRaid(attackingTeamId, defendingTeamId, result, {
       touch: touchPoints,
       bonus: bonusPoints,
       tackle: tacklePoints,
+      technical: technicalPoints,
       allOut: allOutPoints,
       scoringTeamId: allOutPoints > 0 ? scoringTeamId : undefined
-    }, raiderId, outDefenderIds);
+    }, raiderId || undefined, outDefenderIds, selfOutIds);
     
-    // Auto-switch raid team after recording
-    setAttackingTeamId(defendingTeamId);
+    // Auto-switch raid team after recording standard raids
+    if (result !== 'Technical Point' && result !== 'Self Out') {
+      setAttackingTeamId(defendingTeamId);
+    }
     resetForm();
-    resetRaidTimer();
     if (editingRaidId) onEditRaid(null);
   };
 
@@ -1163,22 +904,6 @@ const RaidInputPanel: React.FC<{
             </div>
           )}
         </div>
-        
-        {/* Compact Raid Clock */}
-        <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${isDoOrDie ? 'bg-white border-red-200' : 'bg-slate-50 border-slate-200'}`}>
-          <Timer className={`w-4 h-4 ${isDoOrDie ? 'text-red-500' : 'text-slate-500'}`} />
-          <span className={`font-mono font-bold text-lg w-8 text-center ${raidTimer <= 5 ? 'text-red-600 animate-pulse' : (isDoOrDie ? 'text-red-700' : 'text-slate-700')}`}>
-            {raidTimer}s
-          </span>
-          <div className={`flex gap-1 ml-1 border-l pl-2 ${isDoOrDie ? 'border-red-200' : 'border-slate-300'}`}>
-            <button onClick={toggleRaidTimer} className={`p-1.5 rounded-md text-white transition-colors ${isRaidTimerRunning ? 'bg-amber-500 hover:bg-amber-600' : 'bg-green-500 hover:bg-green-600'}`}>
-              {isRaidTimerRunning ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
-            </button>
-            <button onClick={resetRaidTimer} className={`p-1.5 rounded-md transition-colors ${isDoOrDie ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}`}>
-              <RotateCcw className="w-3 h-3" />
-            </button>
-          </div>
-        </div>
       </div>
 
       {errorMessage && (
@@ -1187,91 +912,137 @@ const RaidInputPanel: React.FC<{
         </div>
       )}
 
-      {/* Quick Actions - Only show if raider is selected */}
-      {raiderId && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-5">
-          <button
-            onClick={() => handleRecord('Empty')}
-            disabled={isDoOrDie}
-            className={`py-2 px-2 font-bold text-xs rounded-lg transition-colors border ${
-              isDoOrDie 
-                ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed opacity-60' 
-                : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
-            }`}
-            title={isDoOrDie ? "Empty raids are not allowed in Do or Die. Raider is out." : ""}
-          >
-            {isDoOrDie ? 'Empty (Disabled)' : 'Empty Raid'}
-          </button>
-          <button
-            onClick={() => handleRecord('Successful')}
-            className="py-2 px-2 bg-green-100 hover:bg-green-200 text-green-800 font-bold text-xs rounded-lg transition-colors border border-green-200"
-          >
-            Successful
-          </button>
-          <button
-            onClick={() => handleRecord('Unsuccessful')}
-            className="py-2 px-2 bg-red-100 hover:bg-red-200 text-red-800 font-bold text-xs rounded-lg transition-colors border border-red-200"
-          >
-            Tackled
-          </button>
-          <button
-            onClick={() => handleRecord('Super Raid')}
-            className="py-2 px-2 bg-purple-100 hover:bg-purple-200 text-purple-800 font-bold text-xs rounded-lg transition-colors border border-purple-200"
-          >
-            Super Raid
-          </button>
-        </div>
-      )}
+      {/* Quick Actions */}
+      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 mb-5">
+        <button
+          onClick={() => {
+            if (!raiderId) {
+              setErrorMessage('Please select a raider for a standard raid.');
+              return;
+            }
+            handleRecord('Empty');
+          }}
+          disabled={isDoOrDie}
+          className={`py-2 px-2 font-bold text-[10px] rounded-lg transition-colors border ${
+            isDoOrDie 
+              ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed opacity-60' 
+              : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
+          }`}
+          title={isDoOrDie ? "Empty raids are not allowed in Do or Die. Raider is out." : ""}
+        >
+          {isDoOrDie ? 'Empty (X)' : 'Empty Raid'}
+        </button>
+        <button
+          onClick={() => {
+            if (!raiderId) {
+              setErrorMessage('Please select a raider.');
+              return;
+            }
+            handleRecord('Successful');
+          }}
+          className="py-2 px-2 bg-green-100 hover:bg-green-200 text-green-800 font-bold text-[10px] rounded-lg transition-colors border border-green-200"
+        >
+          Successful
+        </button>
+        <button
+          onClick={() => {
+            if (!raiderId) {
+              setErrorMessage('Please select a raider.');
+              return;
+            }
+            handleRecord('Unsuccessful');
+          }}
+          className="py-2 px-2 bg-red-100 hover:bg-red-200 text-red-800 font-bold text-[10px] rounded-lg transition-colors border border-red-200"
+        >
+          Tackled
+        </button>
+        <button
+          onClick={() => {
+            if (!raiderId) {
+              setErrorMessage('Please select a raider.');
+              return;
+            }
+            handleRecord('Super Raid');
+          }}
+          className="py-2 px-2 bg-purple-100 hover:bg-purple-200 text-purple-800 font-bold text-[10px] rounded-lg transition-colors border border-purple-200"
+        >
+          Super Raid
+        </button>
+        <button
+          onClick={() => {
+            if (technicalPoints === 0) {
+              setErrorMessage('Please increase Technical Points first.');
+              return;
+            }
+            if (!scoringTeamId) {
+              setErrorMessage('Please select scoring team for Technical Point.');
+              return;
+            }
+            handleRecord('Technical Point');
+          }}
+          className="py-2 px-2 bg-amber-100 hover:bg-amber-200 text-amber-800 font-bold text-[10px] rounded-lg transition-colors border border-amber-200"
+        >
+          Technical
+        </button>
+        <button
+          onClick={() => {
+            if (selfOutIds.length === 0) {
+              setErrorMessage('Please select players who are Self Out.');
+              return;
+            }
+            handleRecord('Self Out');
+          }}
+          className="py-2 px-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 font-bold text-[10px] rounded-lg transition-colors border border-zinc-200"
+        >
+          Self Out
+        </button>
+      </div>
 
-      {/* Team & Raider Selection - Only show if timer has started */}
-      {hasTimerStarted && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-          <div>
-            <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Attacking Team</label>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setAttackingTeamId(teamA.id)}
-                className={`flex-1 py-2 px-2 rounded-lg font-bold text-sm transition-all border ${
-                  attackingTeamId === teamA.id 
-                    ? 'bg-indigo-50 border-indigo-600 text-indigo-700 shadow-sm' 
-                    : 'bg-white border-slate-200 text-slate-500 hover:border-indigo-300'
-                }`}
-              >
-                {teamA.name}
-              </button>
-              <button
-                onClick={() => setAttackingTeamId(teamB.id)}
-                className={`flex-1 py-2 px-2 rounded-lg font-bold text-sm transition-all border ${
-                  attackingTeamId === teamB.id 
-                    ? 'bg-orange-50 border-orange-600 text-orange-700 shadow-sm' 
-                    : 'bg-white border-slate-200 text-slate-500 hover:border-orange-300'
-                }`}
-              >
-                {teamB.name}
-              </button>
-            </div>
-          </div>
-          <div>
-            <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Raider</label>
-            <select
-              value={raiderId}
-              onChange={(e) => setRaiderId(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50 text-sm"
+      {/* Team & Raider Selection */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+        <div>
+          <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Attacking Team</label>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setAttackingTeamId(teamA.id)}
+              className={`flex-1 py-2 px-2 rounded-lg font-bold text-sm transition-all border ${
+                attackingTeamId === teamA.id 
+                  ? 'bg-indigo-50 border-indigo-600 text-indigo-700 shadow-sm' 
+                  : 'bg-white border-slate-200 text-slate-500 hover:border-indigo-300'
+              }`}
             >
-              <option value="">-- Select Player --</option>
-              {attackingPlayers.map(p => (
-                <option key={p.id} value={p.id}>
-                  {p.jerseyNumber ? `#${p.jerseyNumber} - ` : ''}{p.name}
-                </option>
-              ))}
-            </select>
+              {teamA.name}
+            </button>
+            <button
+              onClick={() => setAttackingTeamId(teamB.id)}
+              className={`flex-1 py-2 px-2 rounded-lg font-bold text-sm transition-all border ${
+                attackingTeamId === teamB.id 
+                  ? 'bg-orange-50 border-orange-600 text-orange-700 shadow-sm' 
+                  : 'bg-white border-slate-200 text-slate-500 hover:border-orange-300'
+              }`}
+            >
+              {teamB.name}
+            </button>
           </div>
         </div>
-      )}
+        <div>
+          <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Raider</label>
+          <select
+            value={raiderId}
+            onChange={(e) => setRaiderId(e.target.value)}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50 text-sm"
+          >
+            <option value="">-- Select Player --</option>
+            {attackingPlayers.map(p => (
+              <option key={p.id} value={p.id}>
+                {p.jerseyNumber ? `#${p.jerseyNumber} - ` : ''}{p.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
 
-      {/* Points Configuration & All Out - Only show if raider is selected */}
-      {raiderId && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
           <div className="bg-slate-50 p-2 rounded-lg border border-slate-200 flex flex-col items-center">
             <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Touch</label>
             <div className="flex items-center justify-between bg-white border border-slate-300 rounded p-1 w-full">
@@ -1311,15 +1082,28 @@ const RaidInputPanel: React.FC<{
             </div>
           </div>
 
+          <div className="bg-slate-50 p-2 rounded-lg border border-slate-200 flex flex-col items-center">
+            <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Technical</label>
+            <div className="flex items-center justify-between bg-white border border-slate-300 rounded p-1 w-full">
+              <button onClick={() => setTechnicalPoints(Math.max(0, technicalPoints - 1))} className="p-1 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors">
+                <Minus className="w-4 h-4" />
+              </button>
+              <span className="text-lg font-black text-slate-800 w-6 text-center">{technicalPoints}</span>
+              <button onClick={() => setTechnicalPoints(technicalPoints + 1)} className="p-1 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors">
+                <Plus className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
           <div className="bg-slate-50 p-2 rounded-lg border border-slate-200 flex flex-col items-center justify-center">
-            <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">All Out By</label>
+            <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Scoring Team</label>
             <select 
               value={scoringTeamId} 
               onChange={(e) => {
                 setScoringTeamId(e.target.value);
-                setAllOutPoints(e.target.value ? 2 : 0);
+                // If it was None, don't auto-set All Out points here to avoid confusion
               }}
-              className="w-full text-xs p-1.5 border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="w-full text-[10px] p-1.5 border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500 font-bold"
             >
               <option value="">None</option>
               <option value={teamA.id}>{teamA.name}</option>
@@ -1327,10 +1111,98 @@ const RaidInputPanel: React.FC<{
             </select>
           </div>
         </div>
-      )}
+        
+        {/* All Out Toggle */}
+        <div className="mb-4 flex items-center gap-4 p-2 bg-indigo-50 rounded-lg border border-indigo-100">
+          <span className="text-[10px] font-black text-indigo-900 uppercase tracking-wider">All Out (2 pts):</span>
+          <div className="flex gap-2 flex-1">
+            <button
+              onClick={() => {
+                if (scoringTeamId === teamA.id && allOutPoints === 2) {
+                  setScoringTeamId('');
+                  setAllOutPoints(0);
+                } else {
+                  setScoringTeamId(teamA.id);
+                  setAllOutPoints(2);
+                }
+              }}
+              className={`flex-1 py-1.5 px-2 rounded font-bold text-[10px] transition-all border ${
+                scoringTeamId === teamA.id && allOutPoints === 2
+                  ? 'bg-indigo-600 border-indigo-700 text-white shadow-sm'
+                  : 'bg-white border-indigo-200 text-indigo-600 hover:bg-indigo-50'
+              }`}
+            >
+              All Out By {teamA.name}
+            </button>
+            <button
+              onClick={() => {
+                if (scoringTeamId === teamB.id && allOutPoints === 2) {
+                  setScoringTeamId('');
+                  setAllOutPoints(0);
+                } else {
+                  setScoringTeamId(teamB.id);
+                  setAllOutPoints(2);
+                }
+              }}
+              className={`flex-1 py-1.5 px-2 rounded font-bold text-[10px] transition-all border ${
+                scoringTeamId === teamB.id && allOutPoints === 2
+                  ? 'bg-orange-600 border-orange-700 text-white shadow-sm'
+                  : 'bg-white border-orange-200 text-orange-600 hover:bg-orange-50'
+              }`}
+            >
+              All Out By {teamB.name}
+            </button>
+          </div>
+        </div>
+
+      {/* Self Out Selection */}
+      <div className="p-3 bg-zinc-50 rounded-lg border border-zinc-200 mb-4">
+        <label className="block text-[10px] font-bold text-zinc-900 mb-2 uppercase tracking-wider">
+          Select Players Self Out (Technical)
+        </label>
+        <div className="flex flex-wrap gap-4">
+          <div className="flex-1">
+            <span className="block text-[8px] font-black text-indigo-600 mb-1 uppercase">{teamA.name}</span>
+            <div className="flex flex-wrap gap-1">
+              {players.filter(p => p.teamId === teamA.id && (match.lineup?.teamA?.onMat || []).includes(p.id)).map(p => (
+                <button
+                  key={p.id}
+                  onClick={() => toggleSelfOut(p.id)}
+                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold border transition-colors ${
+                    selfOutIds.includes(p.id) 
+                      ? 'bg-zinc-800 border-zinc-900 text-white shadow-sm' 
+                      : 'bg-white border-slate-200 text-slate-700 hover:border-zinc-400'
+                  }`}
+                >
+                  {p.jerseyNumber ? `#${p.jerseyNumber} ` : ''}{p.name}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="w-px bg-zinc-200" />
+          <div className="flex-1">
+            <span className="block text-[8px] font-black text-orange-600 mb-1 uppercase">{teamB.name}</span>
+            <div className="flex flex-wrap gap-1">
+              {players.filter(p => p.teamId === teamB.id && (match.lineup?.teamB?.onMat || []).includes(p.id)).map(p => (
+                <button
+                  key={p.id}
+                  onClick={() => toggleSelfOut(p.id)}
+                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold border transition-colors ${
+                    selfOutIds.includes(p.id) 
+                      ? 'bg-zinc-800 border-zinc-900 text-white shadow-sm' 
+                      : 'bg-white border-slate-200 text-slate-700 hover:border-zinc-400'
+                  }`}
+                >
+                  {p.jerseyNumber ? `#${p.jerseyNumber} ` : ''}{p.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Defender Selection (if touch points > 0) */}
-      {raiderId && touchPoints > 0 && (
+      {touchPoints > 0 && (
         <div className="p-3 bg-indigo-50 rounded-lg border border-indigo-100">
           <label className="block text-[10px] font-bold text-indigo-900 mb-2 uppercase tracking-wider">
             Select Defenders Touched ({outDefenderIds.length}/{touchPoints})

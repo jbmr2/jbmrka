@@ -2,15 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ref, onValue, query } from 'firebase/database';
 import { db } from '../firebase';
-import { Timer, ArrowLeft, History, Users, Swords, Activity, Monitor, Tv, Trophy } from 'lucide-react';
+import { ArrowLeft, History, Users, Swords, Activity, Monitor, Tv, Trophy } from 'lucide-react';
 
 export const MatchDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [match, setMatch] = useState<any>(null);
   const [raids, setRaids] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [timerSeconds, setTimerSeconds] = useState(0);
-  const [raidTimer, setRaidTimer] = useState(30);
   const serverOffsetRef = useRef<number>(0);
 
   useEffect(() => {
@@ -31,22 +29,6 @@ export const MatchDetails: React.FC = () => {
       if (snapshot.exists()) {
         const data = snapshot.val();
         setMatch({ id: snapshot.key, ...data });
-        
-        // Calculate main timer
-        let currentSeconds = data.timerSeconds !== undefined ? data.timerSeconds : (data.initialTimerSeconds || 2700);
-        if (data.isTimerRunning && data.timerUpdatedAt) {
-          const elapsed = Math.floor((getServerTime() - data.timerUpdatedAt) / 1000);
-          currentSeconds = Math.max(0, currentSeconds - elapsed);
-        }
-        setTimerSeconds(currentSeconds);
-
-        // Calculate raid timer
-        let currentRaidSeconds = data.raidTimerSeconds !== undefined ? data.raidTimerSeconds : 30;
-        if (data.isRaidTimerRunning && data.raidTimerUpdatedAt) {
-          const elapsed = Math.floor((getServerTime() - data.raidTimerUpdatedAt) / 1000);
-          currentRaidSeconds = Math.max(0, currentRaidSeconds - elapsed);
-        }
-        setRaidTimer(currentRaidSeconds);
       }
       setLoading(false);
     }, (error) => {
@@ -70,26 +52,6 @@ export const MatchDetails: React.FC = () => {
     };
   }, [id]);
 
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (match?.isTimerRunning) {
-      interval = setInterval(() => {
-        setTimerSeconds(prev => Math.max(0, prev - 1));
-      }, 1000);
-    }
-    return () => clearInterval(interval);
-  }, [match?.isTimerRunning]);
-
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (match?.isRaidTimerRunning) {
-      interval = setInterval(() => {
-        setRaidTimer(prev => Math.max(0, prev - 1));
-      }, 1000);
-    }
-    return () => clearInterval(interval);
-  }, [match?.isRaidTimerRunning]);
-
   if (loading) return <div className="flex justify-center p-20"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div></div>;
   
   if (!match) {
@@ -106,12 +68,6 @@ export const MatchDetails: React.FC = () => {
       </div>
     );
   }
-
-  const formatTime = (seconds: number) => {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-  };
 
   return (
     <div className="max-w-5xl mx-auto space-y-8">
@@ -141,10 +97,6 @@ export const MatchDetails: React.FC = () => {
               </Link>
             )}
           </div>
-          <div className="flex items-center gap-2 text-indigo-400 font-mono font-black text-xl">
-            <Timer className="w-5 h-5" />
-            {formatTime(timerSeconds)}
-          </div>
         </div>
 
         <div className="p-8 md:p-12 flex flex-col md:flex-row items-center justify-between gap-12 relative">
@@ -160,16 +112,10 @@ export const MatchDetails: React.FC = () => {
             <div className="text-7xl md:text-8xl font-black text-indigo-500 tabular-nums drop-shadow-[0_0_30px_rgba(79,70,229,0.3)]">{match.teamAScore || 0}</div>
           </div>
 
-          {/* VS & Raid Timer */}
+          {/* VS Divider */}
           <div className="flex flex-col items-center gap-6">
             <div className="w-px h-16 bg-gradient-to-b from-transparent via-white/10 to-transparent hidden md:block"></div>
-            <div className="relative group">
-              <div className="absolute inset-0 bg-indigo-600/20 blur-2xl rounded-full group-hover:bg-indigo-600/40 transition-all"></div>
-              <div className={`w-24 h-24 rounded-3xl border-2 flex flex-col items-center justify-center relative bg-slate-900 shadow-2xl transition-all ${raidTimer <= 5 ? 'border-red-500 animate-pulse' : 'border-white/10'}`}>
-                <span className="text-[8px] font-black text-white/30 uppercase tracking-widest mb-1">RAID</span>
-                <span className={`text-4xl font-mono font-black tabular-nums ${raidTimer <= 5 ? 'text-red-500' : 'text-white'}`}>{raidTimer}</span>
-              </div>
-            </div>
+            <div className="text-white/20 font-black text-4xl italic tracking-tighter">VS</div>
             <div className="w-px h-16 bg-gradient-to-t from-transparent via-white/10 to-transparent hidden md:block"></div>
           </div>
 

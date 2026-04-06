@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ref, onValue, update, query, orderByChild, equalTo, push, set, get, child } from 'firebase/database';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
-import { Play, Pause, RotateCcw, Timer, Check, AlertCircle, ChevronRight, LayoutDashboard, Minus, Plus, ArrowRightLeft, Volume2, VolumeX, Shield, Trash2 } from 'lucide-react';
+import { RotateCcw, Check, AlertCircle, ChevronRight, LayoutDashboard, Minus, Plus, ArrowRightLeft, Volume2, VolumeX, Shield, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const WHISTLE_URL = 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3';
@@ -34,14 +34,8 @@ export const UmpirePanel: React.FC = () => {
     }
   };
   
-  const [timerSeconds, setTimerSeconds] = useState(0);
-  const [isTimerRunning, setIsTimerRunning] = useState(false);
-  const [raidTimer, setRaidTimer] = useState(30);
-  const [isRaidTimerRunning, setIsRaidTimerRunning] = useState(false);
   const [raidingTeam, setRaidingTeam] = useState<'A' | 'B' | null>(null);
   
-  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const raidIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const serverOffsetRef = useRef<number>(0);
 
   // Sync with server time offset
@@ -59,8 +53,7 @@ export const UmpirePanel: React.FC = () => {
   const [newMatch, setNewMatch] = useState({
     teamAName: '',
     teamBName: '',
-    matchDate: new Date().toISOString().slice(0, 16),
-    durationMinutes: 40
+    matchDate: new Date().toISOString().slice(0, 16)
   });
 
   const handleCreateMatch = async (e: React.FormEvent) => {
@@ -69,18 +62,12 @@ export const UmpirePanel: React.FC = () => {
     
     const matchesRef = ref(db, 'matches');
     const newMatchRef = push(matchesRef);
-    const initialSeconds = Math.floor(newMatch.durationMinutes * 60 / 2); // Default to half duration for kabaddi
     
     await set(ref(db, `matches/${newMatchRef.key}`), {
       ...newMatch,
       status: 'Scheduled',
       teamAScore: 0,
       teamBScore: 0,
-      initialTimerSeconds: initialSeconds,
-      timerSeconds: initialSeconds,
-      isTimerRunning: false,
-      raidTimerSeconds: 30,
-      isRaidTimerRunning: false,
       createdAt: new Date().toISOString(),
       ownerId: user.uid
     });
@@ -134,27 +121,6 @@ export const UmpirePanel: React.FC = () => {
 
         setMatch({ id: snapshot.key, ...data });
         
-        // Sync timers if they aren't running locally (initial load or remote change)
-        if (!isTimerRunning) {
-          let currentSeconds = data.timerSeconds !== undefined ? data.timerSeconds : (data.initialTimerSeconds || 2700);
-          if (data.isTimerRunning && data.timerUpdatedAt) {
-            const elapsed = Math.floor((getServerTime() - data.timerUpdatedAt) / 1000);
-            currentSeconds = Math.max(0, currentSeconds - elapsed);
-          }
-          setTimerSeconds(currentSeconds);
-          setIsTimerRunning(data.isTimerRunning || false);
-        }
-
-        if (!isRaidTimerRunning) {
-          let currentRaidSeconds = data.raidTimerSeconds !== undefined ? data.raidTimerSeconds : 30;
-          if (data.isRaidTimerRunning && data.raidTimerUpdatedAt) {
-            const elapsed = Math.floor((getServerTime() - data.raidTimerUpdatedAt) / 1000);
-            currentRaidSeconds = Math.max(0, currentRaidSeconds - elapsed);
-          }
-          setRaidTimer(currentRaidSeconds);
-          setIsRaidTimerRunning(data.isRaidTimerRunning || false);
-        }
-
         // Sync raiding team
         setRaidingTeam(data.raidingTeam || null);
 
@@ -172,130 +138,6 @@ export const UmpirePanel: React.FC = () => {
 
     return () => unsub();
   }, [selectedMatchId]);
-
-  // Match Timer Logic
-  useEffect(() => {
-    if (isTimerRunning) {
-      timerIntervalRef.current = setInterval(() => {
-        setTimerSeconds(prev => {
-          if (prev <= 1) {
-            stopMatchTimer();
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    } else if (timerIntervalRef.current) {
-      clearInterval(timerIntervalRef.current);
-    }
-    return () => { if (timerIntervalRef.current) clearInterval(timerIntervalRef.current); };
-  }, [isTimerRunning]);
-
-  // Raid Timer Logic
-  useEffect(() => {
-    if (isRaidTimerRunning) {
-      raidIntervalRef.current = setInterval(() => {
-        setRaidTimer(prev => {
-          if (prev <= 1) {
-            playSound('buzzer');
-            stopRaidTimer();
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    } else if (raidIntervalRef.current) {
-      clearInterval(raidIntervalRef.current);
-    }
-    return () => { if (raidIntervalRef.current) clearInterval(raidIntervalRef.current); };
-  }, [isRaidTimerRunning]);
-
-  // Sync Match Timer to DB every 5s
-  useEffect(() => {
-    if (!selectedMatchId || !isTimerRunning) return;
-    const interval = setInterval(() => {
-      update(ref(db, `matches/${selectedMatchId}`), {
-        timerSeconds,
-        timerUpdatedAt: getServerTime(),
-        isTimerRunning: true
-      });
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [selectedMatchId, isTimerRunning, timerSeconds]);
-
-  const toggleMatchTimer = async () => {
-    if (!selectedMatchId || !match) return;
-    const newState = !isTimerRunning;
-    setIsTimerRunning(newState);
-    
-    await update(ref(db, `matches/${selectedMatchId}`), {
-      isTimerRunning: newState,
-      timerSeconds,
-      timerUpdatedAt: getServerTime(),
-      status: match.status === 'Scheduled' ? 'First Half' : match.status
-    });
-    playSound('whistle');
-  };
-
-  const stopMatchTimer = async () => {
-    if (!selectedMatchId) return;
-    setIsTimerRunning(false);
-    playSound('whistle');
-    await update(ref(db, `matches/${selectedMatchId}`), {
-      isTimerRunning: false,
-      timerSeconds: 0,
-      timerUpdatedAt: getServerTime()
-    });
-  };
-
-  const toggleRaidTimer = async () => {
-    if (!selectedMatchId || !match) return;
-    const newState = !isRaidTimerRunning;
-    
-    // If starting a new raid, reset clock to 30
-    if (newState && raidTimer === 0) {
-      setRaidTimer(30);
-    }
-
-    setIsRaidTimerRunning(newState);
-    
-    await update(ref(db, `matches/${selectedMatchId}`), {
-      isRaidTimerRunning: newState,
-      raidTimerSeconds: (newState && raidTimer === 0) ? 30 : raidTimer,
-      raidTimerUpdatedAt: getServerTime()
-    });
-  };
-
-  const resetRaidTimer = async () => {
-    if (!selectedMatchId) return;
-    setRaidTimer(30);
-    await update(ref(db, `matches/${selectedMatchId}`), {
-      raidTimerSeconds: 30,
-      raidTimerUpdatedAt: getServerTime(),
-      isRaidTimerRunning: isRaidTimerRunning
-    });
-  };
-
-  const stopRaidTimer = async () => {
-    if (!selectedMatchId) return;
-    setIsRaidTimerRunning(false);
-    
-    // Auto-switch raiding team for the next raid
-    let nextTeam: 'A' | 'B' | null = null;
-    if (raidingTeam === 'A') nextTeam = 'B';
-    else if (raidingTeam === 'B') nextTeam = 'A';
-    else nextTeam = null; // If none selected, stay none
-    
-    setRaidingTeam(nextTeam);
-    setRaidTimer(30);
-    
-    await update(ref(db, `matches/${selectedMatchId}`), {
-      isRaidTimerRunning: false,
-      raidTimerSeconds: 30,
-      raidTimerUpdatedAt: getServerTime(),
-      raidingTeam: nextTeam
-    });
-  };
 
   const selectRaidingTeam = async (team: 'A' | 'B' | null) => {
     if (!selectedMatchId) return;
@@ -323,16 +165,6 @@ export const UmpirePanel: React.FC = () => {
     
     const updates: any = { status };
     
-    // Reset timer when switching to certain statuses
-    if (status === 'First Half' || status === 'Second Half') {
-      const initialSeconds = match.initialTimerSeconds || (match.durationMinutes ? match.durationMinutes * 60 : 1200);
-      updates.timerSeconds = initialSeconds;
-      updates.timerUpdatedAt = getServerTime();
-      updates.isTimerRunning = false;
-      setTimerSeconds(initialSeconds);
-      setIsTimerRunning(false);
-    }
-    
     await update(ref(db, `matches/${selectedMatchId}`), updates);
   };
 
@@ -350,12 +182,6 @@ export const UmpirePanel: React.FC = () => {
     } catch (error) {
       console.error("Error updating score:", error);
     }
-  };
-
-  const formatTime = (seconds: number) => {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
   if (!selectedMatchId) {
@@ -409,7 +235,7 @@ export const UmpirePanel: React.FC = () => {
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Date & Time</label>
                   <input
@@ -417,16 +243,6 @@ export const UmpirePanel: React.FC = () => {
                     type="datetime-local"
                     value={newMatch.matchDate}
                     onChange={(e) => setNewMatch({...newMatch, matchDate: e.target.value})}
-                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Duration (min)</label>
-                  <input
-                    required
-                    type="number"
-                    value={newMatch.durationMinutes}
-                    onChange={(e) => setNewMatch({...newMatch, durationMinutes: parseInt(e.target.value)})}
                     className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
                   />
                 </div>
@@ -596,7 +412,7 @@ export const UmpirePanel: React.FC = () => {
         </div>
       </div>
 
-      {/* Two Column Layout for Scoring and Clocks */}
+      {/* Two Column Layout for Scoring */}
       <div className="grid grid-cols-2 gap-4 relative">
         {/* Raiding Team Switch Toggle */}
         <div className="absolute -top-16 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-2">
@@ -630,162 +446,63 @@ export const UmpirePanel: React.FC = () => {
         </button>
 
         {/* Team A Box */}
-        <div className={`p-4 rounded-2xl border transition-all flex flex-col items-center justify-between ${
-          raidingTeam === 'A' ? 'bg-indigo-50 border-indigo-600 ring-2 ring-indigo-200' : 'bg-white border-slate-200 shadow-sm'
+        <div className={`p-8 rounded-2xl border transition-all flex flex-col items-center justify-center ${
+          raidingTeam === 'A' ? 'bg-indigo-50 border-indigo-600 ring-4 ring-indigo-200 shadow-2xl scale-[1.02]' : 'bg-white border-slate-200 shadow-sm'
         }`}>
-          <div className="flex justify-between items-start w-full mb-2">
-            <h3 className="font-bold text-slate-800 uppercase tracking-wider text-[10px] truncate max-w-[60%]">{match.teamAName}</h3>
+          <div className="flex flex-col items-center w-full mb-6">
+            <h3 className="font-black text-slate-800 uppercase tracking-widest text-sm mb-2 text-center">{match.teamAName}</h3>
+            <div className={`px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-[0.2em] border transition-all ${
+              raidingTeam === 'A' 
+                ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg animate-pulse' 
+                : 'bg-slate-50 border-slate-200 text-slate-300'
+            }`}>
+              {raidingTeam === 'A' ? 'CURRENTLY RAIDING' : 'WAITING'}
+            </div>
+          </div>
+          <div className="text-[10rem] font-black text-indigo-600 leading-none mb-8 tabular-nums drop-shadow-sm">{match.teamAScore || 0}</div>
+          <div className="flex gap-4 justify-center w-full">
             <button
-              onClick={() => selectRaidingTeam(raidingTeam === 'A' ? null : 'A')}
-              className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-tighter border transition-all ${
-                raidingTeam === 'A' 
-                  ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm' 
-                  : 'bg-slate-50 border-slate-200 text-slate-400 hover:bg-indigo-50'
-              }`}
+              onClick={() => adjustScore('A', -1)}
+              className="w-16 h-16 bg-white text-slate-400 rounded-2xl flex items-center justify-center border-2 border-slate-100 hover:border-slate-300 hover:text-slate-600 transition-all active:scale-90 shadow-sm"
             >
-              {raidingTeam === 'A' ? 'Raiding' : 'Raid'}
+              <Minus className="w-8 h-8" />
+            </button>
+            <button
+              onClick={() => adjustScore('A', 1)}
+              className="w-16 h-16 bg-indigo-600 text-white rounded-2xl flex items-center justify-center shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition-all active:scale-90"
+            >
+              <Plus className="w-8 h-8" />
             </button>
           </div>
-          <div className="text-5xl font-black text-indigo-600 mb-4">{match.teamAScore || 0}</div>
-          {isRaidTimerRunning && (
-            <div className="flex gap-3 justify-center w-full animate-in fade-in zoom-in duration-300">
-              <button
-                onClick={() => adjustScore('A', -1)}
-                className="w-12 h-12 bg-slate-100 text-slate-600 rounded-full flex items-center justify-center border border-slate-200 transition-all active:scale-95"
-              >
-                <Minus className="w-6 h-6" />
-              </button>
-              <button
-                onClick={() => adjustScore('A', 1)}
-                className="w-12 h-12 bg-indigo-600 text-white rounded-full flex items-center justify-center shadow-lg shadow-indigo-200 transition-all active:scale-95"
-              >
-                <Plus className="w-6 h-6" />
-              </button>
-            </div>
-          )}
         </div>
 
         {/* Team B Box */}
-        <div className={`p-4 rounded-2xl border transition-all flex flex-col items-center justify-between ${
-          raidingTeam === 'B' ? 'bg-orange-50 border-orange-600 ring-2 ring-orange-200' : 'bg-white border-slate-200 shadow-sm'
+        <div className={`p-8 rounded-2xl border transition-all flex flex-col items-center justify-center ${
+          raidingTeam === 'B' ? 'bg-orange-50 border-orange-600 ring-4 ring-orange-200 shadow-2xl scale-[1.02]' : 'bg-white border-slate-200 shadow-sm'
         }`}>
-          <div className="flex justify-between items-start w-full mb-2">
-            <h3 className="font-bold text-slate-800 uppercase tracking-wider text-[10px] truncate max-w-[60%]">{match.teamBName}</h3>
-            <button
-              onClick={() => selectRaidingTeam(raidingTeam === 'B' ? null : 'B')}
-              className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-tighter border transition-all ${
-                raidingTeam === 'B' 
-                  ? 'bg-orange-600 border-orange-600 text-white shadow-sm' 
-                  : 'bg-slate-50 border-slate-200 text-slate-400 hover:bg-orange-50'
-              }`}
-            >
-              {raidingTeam === 'B' ? 'Raiding' : 'Raid'}
-            </button>
-          </div>
-          <div className="text-5xl font-black text-orange-600 mb-4">{match.teamBScore || 0}</div>
-          {isRaidTimerRunning && (
-            <div className="flex gap-3 justify-center w-full animate-in fade-in zoom-in duration-300">
-              <button
-                onClick={() => adjustScore('B', -1)}
-                className="w-12 h-12 bg-slate-100 text-slate-600 rounded-full flex items-center justify-center border border-slate-200 transition-all active:scale-95"
-              >
-                <Minus className="w-6 h-6" />
-              </button>
-              <button
-                onClick={() => adjustScore('B', 1)}
-                className="w-12 h-12 bg-orange-600 text-white rounded-full flex items-center justify-center shadow-lg shadow-orange-200 transition-all active:scale-95"
-              >
-                <Plus className="w-6 h-6" />
-              </button>
+          <div className="flex flex-col items-center w-full mb-6">
+            <h3 className="font-black text-slate-800 uppercase tracking-widest text-sm mb-2 text-center">{match.teamBName}</h3>
+            <div className={`px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-[0.2em] border transition-all ${
+              raidingTeam === 'B' 
+                ? 'bg-orange-600 border-orange-600 text-white shadow-lg animate-pulse' 
+                : 'bg-slate-50 border-slate-200 text-slate-300'
+            }`}>
+              {raidingTeam === 'B' ? 'CURRENTLY RAIDING' : 'WAITING'}
             </div>
-          )}
-        </div>
-
-        {/* Match Clock Box */}
-        <div className="bg-slate-900 p-4 rounded-2xl text-white shadow-xl flex flex-col items-center justify-between">
-          <div className="flex items-center gap-1.5 text-indigo-400 mb-2">
-            <Timer className="w-4 h-4" />
-            <span className="font-bold uppercase tracking-wider text-[10px]">Match</span>
           </div>
-          <div className="text-4xl font-mono font-black mb-4 tabular-nums tracking-tighter">
-            {formatTime(timerSeconds)}
-          </div>
-          <div className="flex gap-2 w-full">
-            {match.status === 'Halftime' || (timerSeconds === 0 && match.status === 'First Half') ? (
-              <button
-                onClick={async () => {
-                  const initial = match.initialTimerSeconds || 2700;
-                  setTimerSeconds(initial);
-                  setIsTimerRunning(false);
-                  await update(ref(db, `matches/${selectedMatchId}`), {
-                    status: 'Second Half',
-                    timerSeconds: initial,
-                    timerUpdatedAt: getServerTime(),
-                    isTimerRunning: false
-                  });
-                }}
-                className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl font-bold uppercase text-[10px] animate-pulse"
-              >
-                Start 2nd Half
-              </button>
-            ) : (
-              <button
-                onClick={toggleMatchTimer}
-                className={`flex-1 flex items-center justify-center py-2.5 rounded-xl font-bold uppercase text-[10px] transition-all ${
-                  isTimerRunning ? 'bg-orange-600' : 'bg-indigo-600'
-                }`}
-              >
-                {isTimerRunning ? <Pause className="w-3 h-3 fill-white" /> : <Play className="w-3 h-3 fill-white" />}
-              </button>
-            )}
+          <div className="text-[10rem] font-black text-orange-600 leading-none mb-8 tabular-nums drop-shadow-sm">{match.teamBScore || 0}</div>
+          <div className="flex gap-4 justify-center w-full">
             <button
-              onClick={stopMatchTimer}
-              className="px-3 bg-slate-800 text-slate-300 rounded-xl font-bold uppercase text-[10px]"
+              onClick={() => adjustScore('B', -1)}
+              className="w-16 h-16 bg-white text-slate-400 rounded-2xl flex items-center justify-center border-2 border-slate-100 hover:border-slate-300 hover:text-slate-600 transition-all active:scale-90 shadow-sm"
             >
-              <RotateCcw className="w-3 h-3" />
-            </button>
-          </div>
-        </div>
-
-        {/* Raid Clock Box */}
-        <div className="bg-slate-900 p-4 rounded-2xl text-white shadow-xl flex flex-col items-center justify-between">
-          <div className="flex items-center justify-between w-full mb-2">
-            <div className="flex items-center gap-1.5 text-orange-400">
-              <Timer className="w-4 h-4" />
-              <span className="font-bold uppercase tracking-wider text-[10px]">Raid</span>
-            </div>
-            <button 
-              onClick={toggleRaidingTeam}
-              className="p-1 hover:bg-slate-800 rounded-md transition-colors text-slate-400 hover:text-white"
-              title="Switch Raiding Team"
-            >
-              <ArrowRightLeft className="w-3.5 h-3.5" />
-            </button>
-          </div>
-          <div className={`text-4xl font-mono font-black mb-4 tabular-nums tracking-tighter ${raidTimer <= 5 ? 'text-red-500 animate-pulse' : ''}`}>
-            {raidTimer}
-          </div>
-          <div className="flex gap-2 w-full">
-            <button
-              onClick={() => toggleRaidTimer()}
-              className={`flex-1 flex items-center justify-center py-2.5 rounded-xl font-bold uppercase text-[10px] transition-all ${
-                isRaidTimerRunning ? 'bg-orange-600' : 'bg-emerald-600'
-              }`}
-            >
-              {isRaidTimerRunning ? <Pause className="w-3 h-3 fill-white" /> : <Play className="w-3 h-3 fill-white" />}
+              <Minus className="w-8 h-8" />
             </button>
             <button
-              onClick={stopRaidTimer}
-              className="px-3 bg-red-600 text-white rounded-xl font-bold uppercase text-[8px] flex flex-col items-center justify-center leading-tight"
+              onClick={() => adjustScore('B', 1)}
+              className="w-16 h-16 bg-orange-600 text-white rounded-2xl flex items-center justify-center shadow-xl shadow-orange-200 hover:bg-orange-700 transition-all active:scale-90"
             >
-              <span>FINISH</span>
-              <span>RAID</span>
-            </button>
-            <button
-              onClick={resetRaidTimer}
-              className="px-3 bg-slate-800 text-slate-300 rounded-xl font-bold uppercase text-[10px]"
-            >
-              <RotateCcw className="w-3 h-3" />
+              <Plus className="w-8 h-8" />
             </button>
           </div>
         </div>

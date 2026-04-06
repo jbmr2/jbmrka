@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ref, onValue, push, set, query, orderByChild, equalTo, get, remove } from 'firebase/database';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
-import { Users, Swords, Plus, ArrowLeft, Shield, Trash2, AlertTriangle, Calendar, Timer, Monitor, Tv, BarChart3, GitGraph, Volume2, VolumeX } from 'lucide-react';
+import { Users, Swords, Plus, ArrowLeft, Shield, Trash2, AlertTriangle, Calendar, Monitor, Tv, BarChart3, GitGraph, Volume2, VolumeX } from 'lucide-react';
 
 interface Team {
   id: string;
@@ -43,7 +43,6 @@ export const TournamentDetails: React.FC = () => {
   const [newMatch, setNewMatch] = useState({ 
     teamAId: '', 
     teamBId: '', 
-    durationMinutes: 45,
     matchDate: new Date().toISOString().slice(0, 16) // Default to now
   });
   const [matchToDelete, setMatchToDelete] = useState<string | null>(null);
@@ -165,7 +164,6 @@ export const TournamentDetails: React.FC = () => {
     const teamB = teams.find(t => t.id === newMatch.teamBId);
 
     try {
-      const durationSeconds = (newMatch.durationMinutes || 45) * 60;
       const data: any = {
         tournamentId: id,
         tournamentName: tournament.name,
@@ -174,9 +172,6 @@ export const TournamentDetails: React.FC = () => {
         teamAScore: 0,
         teamBScore: 0,
         status: 'Scheduled',
-        timerSeconds: durationSeconds,
-        initialTimerSeconds: durationSeconds, // Store the initial duration
-        isTimerRunning: false,
         ownerId: user.uid,
         matchDate: newMatch.matchDate,
         createdAt: new Date().toISOString(),
@@ -192,7 +187,6 @@ export const TournamentDetails: React.FC = () => {
       setNewMatch({ 
         teamAId: '', 
         teamBId: '', 
-        durationMinutes: 45,
         matchDate: new Date().toISOString().slice(0, 16)
       });
     } catch (error) {
@@ -367,16 +361,6 @@ export const TournamentDetails: React.FC = () => {
                     className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
                   />
                 </div>
-                <div>
-                  <label className="block text-[10px] font-black text-slate-500 uppercase mb-1">Duration (mins) *</label>
-                  <input
-                    type="number"
-                    required
-                    value={newMatch.durationMinutes}
-                    onChange={(e) => setNewMatch({ ...newMatch, durationMinutes: parseInt(e.target.value) || 45 })}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
-                  />
-                </div>
               </div>
               <div className="flex justify-end gap-3">
                 <button type="button" onClick={() => setIsCreatingMatch(false)} className="px-4 py-2 text-xs font-black uppercase text-slate-500 hover:text-slate-800">Cancel</button>
@@ -390,10 +374,10 @@ export const TournamentDetails: React.FC = () => {
               <p className="col-span-full text-slate-400 font-bold uppercase text-center py-12">No matches scheduled yet.</p>
             ) : (
               matches.map(match => (
-                <Link
+                <div
                   key={match.id}
-                  to={`/matches/${match.id}/score`}
-                  className="p-4 rounded-2xl border border-slate-100 hover:border-indigo-600 hover:bg-indigo-50 transition-all group"
+                  onClick={() => navigate(`/matches/${match.id}/score`)}
+                  className="p-4 rounded-2xl border border-slate-100 hover:border-indigo-600 hover:bg-indigo-50 transition-all group cursor-pointer"
                 >
                   <div className="flex justify-between items-center mb-4">
                     <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase border tracking-widest ${
@@ -401,7 +385,7 @@ export const TournamentDetails: React.FC = () => {
                     }`}>
                       {match.status}
                     </span>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                       <Link to={`/obs/${match.id}`} target="_blank" className="p-1.5 text-indigo-400 hover:text-indigo-600"><Monitor className="w-3.5 h-3.5" /></Link>
                       <Link to={`/led/${match.id}`} target="_blank" className="p-1.5 text-orange-400 hover:text-orange-600"><Tv className="w-3.5 h-3.5" /></Link>
                       <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); setMatchToDelete(match.id); }} className="p-1.5 text-slate-300 hover:text-red-600"><Trash2 className="w-3.5 h-3.5" /></button>
@@ -419,7 +403,7 @@ export const TournamentDetails: React.FC = () => {
                       <div className="text-2xl font-black text-orange-600 mt-1">{match.teamBScore || 0}</div>
                     </div>
                   </div>
-                </Link>
+                </div>
               ))
             )}
           </div>
