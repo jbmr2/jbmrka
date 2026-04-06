@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ref, onValue, query, orderByChild } from 'firebase/database';
 import { db } from '../firebase';
-import { Timer, Monitor, Tv, Calendar, Swords, PlayCircle, Clock, CheckCircle2, Trophy } from 'lucide-react';
+import { Timer, Monitor, Tv, Calendar, Swords, PlayCircle, Clock, CheckCircle2, Trophy, ArrowRight } from 'lucide-react';
 
 interface Match {
   id: string;

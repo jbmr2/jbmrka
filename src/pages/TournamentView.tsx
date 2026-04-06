@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ref, onValue, query, orderByChild, equalTo, get } from 'firebase/database';
+import { ref, onValue, query, orderByChild, equalTo } from 'firebase/database';
 import { db } from '../firebase';
 import { Swords, Trophy, Calendar, MapPin, ArrowLeft, Monitor, Tv, History, Timer } from 'lucide-react';
 

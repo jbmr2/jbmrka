@@ -137,7 +137,7 @@ export const MatchDetails: React.FC = () => {
             {match.tournamentId && (
               <Link to={`/tournaments/${match.tournamentId}/view`} className="text-[9px] font-black text-indigo-400 hover:text-indigo-300 uppercase tracking-widest flex items-center gap-1">
                 <Trophy className="w-3 h-3" />
-                Standings & Arena
+                {match.tournamentName || 'Tournament Arena'}
               </Link>
             )}
           </div>
@@ -233,6 +233,12 @@ export const MatchDetails: React.FC = () => {
               <h3 className="font-black text-slate-900 uppercase tracking-tight">Match Info</h3>
             </div>
             <div className="space-y-4">
+              {match.tournamentName && (
+                <div className="flex items-center justify-between py-2 border-b border-slate-50">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tournament</span>
+                  <span className="text-xs font-bold text-indigo-600 uppercase">{match.tournamentName}</span>
+                </div>
+              )}
               <div className="flex items-center justify-between py-2 border-b border-slate-50">
                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Date</span>
                 <span className="text-xs font-bold text-slate-800">{match.matchDate ? new Date(match.matchDate).toLocaleDateString() : 'TBD'}</span>

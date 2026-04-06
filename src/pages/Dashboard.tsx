@@ -145,7 +145,14 @@ export const Dashboard: React.FC = () => {
               {liveMatches.map(m => (
                 <Link key={m.id} to={`/matches/${m.id}`} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-xl hover:shadow-2xl hover:border-indigo-200 transition-all group">
                   <div className="flex justify-between items-center mb-6">
-                    <span className="text-[9px] font-black bg-emerald-50 text-emerald-600 px-2.5 py-1 rounded-full border border-emerald-100 uppercase tracking-widest">{m.status}</span>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[9px] font-black bg-emerald-50 text-emerald-600 px-2.5 py-1 rounded-full border border-emerald-100 uppercase tracking-widest w-fit">{m.status}</span>
+                      {m.tournamentName && (
+                        <span className="text-[8px] font-black text-indigo-500 uppercase tracking-tighter truncate max-w-[100px]">
+                          {m.tournamentName}
+                        </span>
+                      )}
+                    </div>
                     <div className="flex items-center gap-1 text-[8px] font-bold text-slate-400 uppercase tracking-tighter">
                       <Swords className="w-3 h-3" /> LIVE FEED
                     </div>

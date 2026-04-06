@@ -13,8 +13,6 @@ export const LedDisplay: React.FC = () => {
   const [teamB, setTeamB] = useState<any>(null);
   const [tournament, setTournament] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [timerSeconds, setTimerSeconds] = useState(0);
-  const [raidTimer, setRaidTimer] = useState(30);
   const [audioEnabled, setAudioEnabled] = useState(false);
   
   const whistleRef = React.useRef<HTMLAudioElement | null>(null);
@@ -56,22 +54,6 @@ export const LedDisplay: React.FC = () => {
         const data = snapshot.val();
         setMatch({ id: snapshot.key, ...data });
         
-        // Calculate main timer
-        let currentSeconds = data.timerSeconds !== undefined ? data.timerSeconds : (data.initialTimerSeconds || 2700);
-        if (data.isTimerRunning && data.timerUpdatedAt) {
-          const elapsed = Math.floor((getServerTime() - data.timerUpdatedAt) / 1000);
-          currentSeconds = Math.max(0, currentSeconds - elapsed);
-        }
-        setTimerSeconds(currentSeconds);
-
-        // Calculate raid timer
-        let currentRaidSeconds = data.raidTimerSeconds !== undefined ? data.raidTimerSeconds : 30;
-        if (data.isRaidTimerRunning && data.raidTimerUpdatedAt) {
-          const elapsed = Math.floor((getServerTime() - data.raidTimerUpdatedAt) / 1000);
-          currentRaidSeconds = Math.max(0, currentRaidSeconds - elapsed);
-        }
-        setRaidTimer(currentRaidSeconds);
-
         // Fetch tournament name
         if (data.tournamentId && !tournament) {
           const tournamentRef = ref(db, `tournaments/${data.tournamentId}`);
@@ -105,28 +87,6 @@ export const LedDisplay: React.FC = () => {
     };
   }, [match?.teamAId, match?.teamBId]);
 
-  // Main timer interval
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (match?.isTimerRunning) {
-      interval = setInterval(() => {
-        setTimerSeconds(prev => Math.max(0, prev - 1));
-      }, 1000);
-    }
-    return () => clearInterval(interval);
-  }, [match?.isTimerRunning]);
-
-  // Raid timer interval
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (match?.isRaidTimerRunning) {
-      interval = setInterval(() => {
-        setRaidTimer(prev => Math.max(0, prev - 1));
-      }, 1000);
-    }
-    return () => clearInterval(interval);
-  }, [match?.isRaidTimerRunning]);
-
   useEffect(() => {
     if (match) {
       if (match.isTimerRunning !== lastTimerStateRef.current) {
@@ -136,12 +96,6 @@ export const LedDisplay: React.FC = () => {
     }
   }, [match?.isTimerRunning]);
 
-  useEffect(() => {
-    if (raidTimer === 0 && match?.isRaidTimerRunning) {
-      playSound('buzzer');
-    }
-  }, [raidTimer, match?.isRaidTimerRunning]);
-
   if (loading) return <div className="w-screen h-screen bg-black flex items-center justify-center text-yellow-500 font-black uppercase tracking-widest animate-pulse">Loading Arena...</div>;
 
   if (!match) return <div className="w-screen h-screen bg-black flex flex-col items-center justify-center text-red-500 font-black p-12 text-center uppercase border-8 border-red-900/30">
@@ -149,12 +103,6 @@ export const LedDisplay: React.FC = () => {
     <span className="text-4xl tracking-tighter mb-4">MATCH RECORD NOT FOUND</span>
     <span className="text-zinc-600 text-sm tracking-widest">PLEASE CHECK THE MATCH ID IN YOUR OBS/LED LINK</span>
   </div>;
-
-  const formatTime = (seconds: number) => {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-  };
 
   return (
     <div className="w-screen h-screen bg-black overflow-hidden font-mono select-none flex flex-col p-6 text-white relative">
@@ -217,35 +165,6 @@ export const LedDisplay: React.FC = () => {
               {match.teamAScore || 0}
             </span>
           </div>
-        </div>
-
-        {/* CENTER COLUMN: Timers */}
-        <div className="w-[30%] flex flex-col gap-6">
-          
-          {/* MAIN TIMER */}
-          <div className="flex-1 bg-zinc-900 rounded-3xl border-4 border-zinc-800 flex flex-col items-center justify-center p-8 shadow-2xl">
-            <span className="text-zinc-500 text-2xl font-bold uppercase tracking-widest mb-4">Match Clock</span>
-            <div className="text-9xl font-black text-white tabular-nums tracking-tighter drop-shadow-[0_0_30px_rgba(255,255,255,0.2)]">
-              {formatTime(timerSeconds)}
-            </div>
-          </div>
-
-          {/* RAID TIMER */}
-          <div className={`flex-1 rounded-3xl border-4 flex flex-col items-center justify-center p-8 transition-colors duration-300 ${
-            (match.isRaidTimerRunning || raidTimer < 30) 
-              ? (raidTimer <= 5 ? 'bg-red-900/80 border-red-500 animate-pulse' : 'bg-zinc-800 border-yellow-500') 
-              : 'bg-zinc-900 border-zinc-800'
-          }`}>
-            <span className="text-zinc-500 text-2xl font-bold uppercase tracking-widest mb-4">Raid Timer</span>
-            {(match.isRaidTimerRunning || raidTimer < 30) ? (
-              <div className={`text-[10rem] font-black leading-none tabular-nums ${raidTimer <= 5 ? 'text-red-400' : 'text-yellow-400'} drop-shadow-[0_0_40px_rgba(250,204,21,0.3)]`}>
-                {raidTimer}
-              </div>
-            ) : (
-              <div className="text-6xl font-black text-zinc-700 uppercase italic tracking-tighter">WAITING</div>
-            )}
-          </div>
-
         </div>
 
         {/* TEAM B */}

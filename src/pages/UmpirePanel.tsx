@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ref, onValue, update, query, orderByChild, equalTo, push, set, get } from 'firebase/database';
+import { ref, onValue, update, query, orderByChild, equalTo, push, set, get, child } from 'firebase/database';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
-import { Play, Pause, RotateCcw, Timer, Check, AlertCircle, ChevronRight, LayoutDashboard, Minus, Plus, ArrowRightLeft, Volume2, VolumeX } from 'lucide-react';
+import { Play, Pause, RotateCcw, Timer, Check, AlertCircle, ChevronRight, LayoutDashboard, Minus, Plus, ArrowRightLeft, Volume2, VolumeX, Shield, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const WHISTLE_URL = 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3';
@@ -96,7 +96,11 @@ export const UmpirePanel: React.FC = () => {
     const unsub = onValue(matchesRef, (snapshot) => {
       const m: any[] = [];
       snapshot.forEach(child => {
-        m.push({ id: child.key, ...child.val() });
+        const val = child.val();
+        // Strict client-side filter to ensure only matches owned by this user are shown
+        if (val.ownerId === user.uid) {
+          m.push({ id: child.key, ...val });
+        }
       });
       // Sort by matchDate or createdAt
       m.sort((a, b) => {
@@ -120,6 +124,14 @@ export const UmpirePanel: React.FC = () => {
     const unsub = onValue(matchRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.val();
+        
+        // Safety check: Ensure the current user owns this match
+        if (data.ownerId !== user.uid) {
+          console.warn("Unauthorized access attempt to match:", selectedMatchId);
+          setSelectedMatchId(null);
+          return;
+        }
+
         setMatch({ id: snapshot.key, ...data });
         
         // Sync timers if they aren't running locally (initial load or remote change)
@@ -149,11 +161,11 @@ export const UmpirePanel: React.FC = () => {
         // Sync sound enabled state with tournament setting if match belongs to a tournament
         if (data.tournamentId) {
           const tournamentRef = ref(db, `tournaments/${data.tournamentId}/audioEnabled`);
-          get(tournamentRef).then(snap => {
+          onValue(tournamentRef, (snap) => {
             if (snap.exists()) {
               setSoundEnabled(snap.val());
             }
-          });
+          }, { onlyOnce: true });
         }
       }
     });
@@ -462,6 +474,11 @@ export const UmpirePanel: React.FC = () => {
                       VS
                     </div>
                     <div>
+                      {m.tournamentName && (
+                        <div className="text-[10px] font-black text-indigo-600 uppercase tracking-tighter mb-0.5">
+                          {m.tournamentName}
+                        </div>
+                      )}
                       <div className="font-bold text-slate-900">
                         {m.teamAName} vs {m.teamBName}
                       </div>
@@ -532,7 +549,12 @@ export const UmpirePanel: React.FC = () => {
       )}
 
       {/* Header */}
-      <div className="flex flex-col gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+      <div className="flex flex-col gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
+        {match.tournamentName && (
+          <div className="absolute top-0 right-0 bg-indigo-600 text-white text-[8px] font-black px-3 py-1 rounded-bl-xl uppercase tracking-widest shadow-lg">
+            {match.tournamentName}
+          </div>
+        )}
         <div className="flex items-center justify-between">
           <button
             onClick={() => setSelectedMatchId(null)}

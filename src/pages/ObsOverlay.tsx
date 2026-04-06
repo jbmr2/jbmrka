@@ -11,8 +11,6 @@ export const ObsOverlay: React.FC = () => {
   const [match, setMatch] = useState<any>(null);
   const [teamA, setTeamA] = useState<any>(null);
   const [teamB, setTeamB] = useState<any>(null);
-  const [timerSeconds, setTimerSeconds] = useState(0);
-  const [raidTimer, setRaidTimer] = useState(30);
   const [audioEnabled, setAudioEnabled] = useState(false);
   const [tournamentAudio, setTournamentAudio] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -56,22 +54,6 @@ export const ObsOverlay: React.FC = () => {
         const data = snapshot.val();
         setMatch({ id: snapshot.key, ...data });
         
-        // Calculate main timer
-        let currentSeconds = data.timerSeconds !== undefined ? data.timerSeconds : (data.initialTimerSeconds || 2700);
-        if (data.isTimerRunning && data.timerUpdatedAt) {
-          const elapsed = Math.floor((getServerTime() - data.timerUpdatedAt) / 1000);
-          currentSeconds = Math.max(0, currentSeconds - elapsed);
-        }
-        setTimerSeconds(currentSeconds);
-
-        // Calculate raid timer
-        let currentRaidSeconds = data.raidTimerSeconds !== undefined ? data.raidTimerSeconds : 30;
-        if (data.isRaidTimerRunning && data.raidTimerUpdatedAt) {
-          const elapsed = Math.floor((getServerTime() - data.raidTimerUpdatedAt) / 1000);
-          currentRaidSeconds = Math.max(0, currentRaidSeconds - elapsed);
-        }
-        setRaidTimer(currentRaidSeconds);
-
         // Fetch tournament audio setting if applicable
         if (data.tournamentId) {
           onValue(ref(db, `tournaments/${data.tournamentId}/audioEnabled`), (snap) => {
@@ -106,28 +88,6 @@ export const ObsOverlay: React.FC = () => {
     };
   }, [match?.teamAId, match?.teamBId]);
 
-  // Main timer interval
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (match?.isTimerRunning) {
-      interval = setInterval(() => {
-        setTimerSeconds(prev => Math.max(0, prev - 1));
-      }, 1000);
-    }
-    return () => clearInterval(interval);
-  }, [match?.isTimerRunning]);
-
-  // Raid timer interval
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (match?.isRaidTimerRunning) {
-      interval = setInterval(() => {
-        setRaidTimer(prev => Math.max(0, prev - 1));
-      }, 1000);
-    }
-    return () => clearInterval(interval);
-  }, [match?.isRaidTimerRunning]);
-
   useEffect(() => {
     if (match) {
       if (match.isTimerRunning !== lastTimerStateRef.current) {
@@ -137,20 +97,8 @@ export const ObsOverlay: React.FC = () => {
     }
   }, [match?.isTimerRunning]);
 
-  useEffect(() => {
-    if (raidTimer === 0 && match?.isRaidTimerRunning) {
-      playSound('buzzer');
-    }
-  }, [raidTimer, match?.isRaidTimerRunning]);
-
   if (loading) return null; // Overlays should be invisible while loading
   if (!match) return null; // Overlays should be invisible if match doesn't exist
-
-  const formatTime = (seconds: number) => {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-  };
 
   return (
     <div className="w-screen h-screen bg-transparent overflow-hidden font-sans relative">
@@ -161,26 +109,6 @@ export const ObsOverlay: React.FC = () => {
           className="fixed inset-0 z-[200] bg-transparent cursor-pointer"
         >
         </button>
-      )}
-
-      {/* Left Raid Box (Team A) */}
-      {match.raidingTeam === 'A' && (match.isRaidTimerRunning || raidTimer < 30) && (
-        <div className="absolute left-8 bottom-8 w-24 h-24 bg-slate-900/90 border-4 border-indigo-600 rounded-xl flex flex-col items-center justify-center shadow-2xl animate-in slide-in-from-left duration-300">
-          <span className="text-indigo-400 text-[10px] font-black uppercase tracking-widest mb-1">RAID</span>
-          <span className={`text-4xl font-mono font-black tabular-nums leading-none ${raidTimer <= 5 ? 'text-red-500 animate-pulse' : 'text-white'}`}>
-            {raidTimer}
-          </span>
-        </div>
-      )}
-
-      {/* Right Raid Box (Team B) */}
-      {match.raidingTeam === 'B' && (match.isRaidTimerRunning || raidTimer < 30) && (
-        <div className="absolute right-8 bottom-8 w-24 h-24 bg-slate-900/90 border-4 border-orange-600 rounded-xl flex flex-col items-center justify-center shadow-2xl animate-in slide-in-from-right duration-300">
-          <span className="text-orange-400 text-[10px] font-black uppercase tracking-widest mb-1">RAID</span>
-          <span className={`text-4xl font-mono font-black tabular-nums leading-none ${raidTimer <= 5 ? 'text-red-500 animate-pulse' : 'text-white'}`}>
-            {raidTimer}
-          </span>
-        </div>
       )}
 
       {/* Scoreboard (Lower Third) */}
@@ -208,19 +136,9 @@ export const ObsOverlay: React.FC = () => {
           </div>
         </div>
 
-        {/* Center Info */}
-        <div className="flex flex-col items-center justify-center px-8 py-2 bg-slate-900/95 min-w-[200px]">
-          <div className="text-slate-400 text-[10px] font-black uppercase tracking-widest leading-none mb-1">
-            {match.status === 'Scheduled' ? 'First Half' : match.status}
-          </div>
-          <div className="text-4xl font-mono font-bold text-white drop-shadow-md leading-tight">
-            {formatTime(timerSeconds)}
-          </div>
-          {match.matchDate && (
-            <div className="text-[8px] font-black text-slate-500 uppercase tracking-tighter mt-1">
-              {new Date(match.matchDate).toLocaleDateString([], { month: 'short', day: 'numeric' })} • {new Date(match.matchDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </div>
-          )}
+        {/* VS / Divider */}
+        <div className="flex items-center justify-center px-4 py-2 bg-slate-900/95">
+          <div className="text-slate-500 text-xs font-black uppercase tracking-widest">VS</div>
         </div>
 
         {/* Team B */}

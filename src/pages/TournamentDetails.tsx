@@ -79,6 +79,14 @@ export const TournamentDetails: React.FC = () => {
         const docSnap = await get(docRef);
         if (docSnap.exists()) {
           const data = docSnap.val();
+          
+          // Ownership Check: Ensure the current user owns this tournament
+          if (data.ownerId !== user.uid) {
+            console.warn("Unauthorized access attempt to tournament management:", id);
+            navigate('/');
+            return;
+          }
+
           setTournament({ id: docSnap.key, ...data });
           setTournamentAudio(data.audioEnabled === true);
         } else {
@@ -160,6 +168,7 @@ export const TournamentDetails: React.FC = () => {
       const durationSeconds = (newMatch.durationMinutes || 45) * 60;
       const data: any = {
         tournamentId: id,
+        tournamentName: tournament.name,
         teamAId: newMatch.teamAId,
         teamBId: newMatch.teamBId,
         teamAScore: 0,
